@@ -1,0 +1,22 @@
+[
+  { "menu_id": 1, "menu_name": "김치찌개", "category": "한식", "tags": ["매운맛", "든든한", "밥친구"], "price_est": 8000, "prep_time_est": 25 },
+  { "menu_id": 2, "menu_name": "된장찌개", "category": "한식", "tags": ["구수한", "건강", "밥친구"], "price_est": 7500, "prep_time_est": 20 },
+  { "menu_id": 3, "menu_name": "비빔밥", "category": "한식", "tags": ["건강", "다이어트", "야채"], "price_est": 9000, "prep_time_est": 15 },
+  { "menu_id": 4, "menu_name": "불고기덮밥", "category": "한식", "tags": ["고기", "든든한", "간편"], "price_est": 9500, "prep_time_est": 18 },
+  { "menu_id": 5, "menu_name": "칼국수", "category": "한식", "tags": ["면요리", "따뜻한", "담백"], "price_est": 8500, "prep_time_est": 22 },
+  { "menu_id": 6, "menu_name": "쌈밥", "category": "한식", "tags": ["건강", "야채", "다이어트"], "price_est": 10000, "prep_time_est": 20 },
+  { "menu_id": 7, "menu_name": "삼겹살", "category": "한식", "tags": ["고기", "회식", "혼밥"], "price_est": 14000, "prep_time_est": 40 },
+  { "menu_id": 8, "menu_name": "라면", "category": "분식", "tags": ["간편", "야식", "빠른"], "price_est": 4500, "prep_time_est": 5 },
+  { "menu_id": 9, "menu_name": "떡볶이", "category": "분식", "tags": ["매운맛", "간편", "야식"], "price_est": 5000, "prep_time_est": 10 },
+  { "menu_id": 10, "menu_name": "우동", "category": "일식", "tags": ["따뜻한", "담백", "간편"], "price_est": 7000, "prep_time_est": 12 },
+  { "menu_id": 11, "menu_name": "돈카츠", "category": "일식", "tags": ["고기", "바삭", "든든한"], "price_est": 11000, "prep_time_est": 25 },
+  { "menu_id": 12, "menu_name": "초밥", "category": "일식", "tags": ["신선", "건강", "회식"], "price_est": 15000, "prep_time_est": 30 },
+  { "menu_id": 13, "menu_name": "라멘", "category": "일식", "tags": ["면요리", "든든한", "따뜻한"], "price_est": 9000, "prep_time_est": 20 },
+  { "menu_id": 14, "menu_name": "짜장면", "category": "중식", "tags": ["간편", "배달", "혼밥"], "price_est": 6500, "prep_time_est": 15 },
+  { "menu_id": 15, "menu_name": "짬뽕", "category": "중식", "tags": ["매운맛", "해물", "든든한"], "price_est": 7500, "prep_time_est": 18 },
+  { "menu_id": 16, "menu_name": "볶음밥", "category": "중식", "tags": ["간편", "야채", "한그릇"], "price_est": 7000, "prep_time_est": 12 },
+  { "menu_id": 17, "menu_name": "샐러드", "category": "양식", "tags": ["다이어트", "건강", "가벼운"], "price_est": 9000, "prep_time_est": 8 },
+  { "menu_id": 18, "menu_name": "파스타", "category": "양식", "tags": ["분위기", "데이트", "면요리"], "price_est": 12000, "prep_time_est": 25 },
+  { "menu_id": 19, "menu_name": "토스트", "category": "양식", "tags": ["아침", "간편", "빠른"], "price_est": 5500, "prep_time_est": 5 },
+  { "menu_id": 20, "menu_name": "베이글", "category": "양식", "tags": ["아침", "가벼운", "간편"], "price_est": 5000, "prep_time_est": 3 }
+]
