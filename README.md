@@ -1,4 +1,4 @@
-# 메타데이터 기반 추천 API (MVP) Vertex AI로 변경함
+# 메타데이터 기반 추천 API (MVP) Vertex AI ver.
 
 **현재 구현 플로우**
 
@@ -15,7 +15,7 @@ context (더미) + candidates (더미 20개)
 ## 요구 사항
 
 - Python 3.10+
-- (선택) `OPENAI_API_KEY` — 없으면 모든 요청에 fallback 응답(selected=top_k[0], 템플릿 사유) 반환
+- (선택) `GOOGLE_APPLICATION_CREDENTIALS` — 없으면 모든 요청에 fallback 응답(selected=top_k[0], 템플릿 사유) 반환
 
 ## 설치
 
@@ -28,14 +28,15 @@ pip install -r requirements.txt
 
 ## 환경 변수 (선택)
 
-| 변수 | 설명 |
-|------|------|
-| `OPENAI_API_KEY` | OpenAI API 키. 없으면 fallback 사용 |
-| `OPENAI_BASE_URL` | API 베이스 URL (Azure/로컬 등) |
-| `LLM_MODEL` | 모델명 (기본: `gpt-4o-mini`) |
-| `LLM_TEMPERATURE` | 생성 온도 (재현성 높이려면 `0`) |
+| 변수 | 설명 | 예시 |
+| :--- | :--- | :--- |
+| `GOOGLE_APPLICATION_CREDENTIALS` | GCP 서비스 계정 키 JSON 절대 경로 | `C:/절대경로/key.json` |
+| `GOOGLE_CLOUD_PROJECT` | Google Cloud 프로젝트 ID | `내-프로젝트-ID` |
+| `GOOGLE_CLOUD_LOCATION` | Vertex AI 서비스 리전 | `us-central1` |
+| `LLM_MODEL` | 사용할 모델명 (기본: `gemini-2.0-flash`) | `gemini-2.0-flash` |
+| `LLM_TEMPERATURE` | 생성 온도 (낮을수록 일관된 답변 생성) | `0.3` |
 
-`.env` 파일은 저장소에 포함되지 않습니다. 프로젝트 루트에 `.env`를 만들고 `OPENAI_API_KEY` 등을 넣으면 서버가 로드합니다. 예시는 `.env.example`을 참고하세요.
+`.env` 파일은 저장소에 포함되지 않습니다. 프로젝트 루트에 `.env`를 만들고 위 변수들을 넣으면 서버가 로드합니다. 예시는 `.env.example`을 참고하세요.
 
 ## 실행 방법
 
@@ -132,7 +133,7 @@ ai_plus/
 
 ## Fallback
 
-LLM 호출 실패 또는 `OPENAI_API_KEY` 미설정 시:
+LLM 호출 실패 또는 `GOOGLE_APPLICATION_CREDENTIALS` 미설정 시:
 
 - `selected_menu_id`: `top_k[0]`
 - `reason_one_liner`: `"선택한 메뉴가 현재 상황에 잘 맞습니다."`
