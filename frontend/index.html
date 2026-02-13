@@ -460,7 +460,7 @@
         if (fallbackNotice) {
           fallbackNotice.style.display = isFallback ? 'block' : 'none';
           fallbackNotice.textContent = isFallback
-            ? '⚠️ LLM이 호출되지 않았습니다. .env에 OPENAI_API_KEY가 있는지 확인하고, 서버를 재시작한 뒤 다시 시도하세요.'
+            ? '⚠️ LLM이 호출되지 않았습니다. .env에 OPENAI_API_KEY나 Vertex AI API가 있는지 확인하고, 서버를 재시작한 뒤 다시 시도하세요.'
             : '';
         }
         outputRaw.textContent = JSON.stringify({

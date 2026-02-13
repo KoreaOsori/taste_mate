@@ -22,11 +22,19 @@ logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
 
-_api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
-if _api_key:
-    logger.info("OPENAI_API_KEY 로드됨 (끝 4자리: ...%s)", _api_key[-4:] if len(_api_key) >= 4 else "****")
+# 수정 전 (OpenAI)
+# _api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+# if _api_key:
+#     logger.info("OPENAI_API_KEY 로드됨 (끝 4자리: ...%s)", _api_key[-4:] if len(_api_key) >= 4 else "****")
+# else:
+#     logger.warning("OPENAI_API_KEY 없음 → fallback 응답 사용.")
+
+# 수정 후 (Vertex AI/GCP 기준)
+_gcp_project = (os.getenv("GOOGLE_CLOUD_PROJECT") or "").strip()
+if _gcp_project:
+    logger.info("Vertex AI 활성화됨 (프로젝트 ID: %s)", _gcp_project)
 else:
-    logger.warning("OPENAI_API_KEY 없음 → fallback 응답 사용.")
+    logger.error("GOOGLE_CLOUD_PROJECT 설정 없음! Vertex AI 기능을 사용할 수 없습니다.")
 
 app = FastAPI(title="Recommendation API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
