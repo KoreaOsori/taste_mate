@@ -14,13 +14,13 @@ context (더미) + candidates (더미 20개)
 
 ## 요구 사항
 
-- Python 3.10+
+- Python 3.10+(3.12 이하)
 - (선택) `GOOGLE_APPLICATION_CREDENTIALS` — 없으면 모든 요청에 fallback 응답(selected=top_k[0], 템플릿 사유) 반환
 
 ## 설치
 
 ```bash
-cd ai_plus
+cd taste_mate
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -43,7 +43,7 @@ pip install -r requirements.txt
 ### 1. 서버 기동
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 코드 수정 후에는 서버를 재시작하거나 `--reload` 사용 시 자동 반영됩니다.
