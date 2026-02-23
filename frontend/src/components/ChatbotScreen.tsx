@@ -3,6 +3,7 @@ import { UserProfile } from '../App';
 import { Send, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { chatService } from '../api/apiClient';
 
 interface Message {
   id: string;
@@ -29,58 +30,24 @@ export function ChatbotScreen({ userProfile }: ChatbotScreenProps) {
     scrollToBottom();
   }, [messages]);
 
+  const getWelcomeMessage = (): Message => ({
+    id: 'welcome',
+    role: 'assistant',
+    content: `안녕하세요, ${userProfile.name}님! 😊\n\n저는 건강한 식단 관리를 도와드리는 AI 영양 상담사입니다.\n\n다음과 같은 도움을 드릴 수 있어요:\n• 🍽️ 맞춤 식사 메뉴 추천\n• 📊 칼로리 및 영양소 분석\n• 💪 건강 목표 달성 조언\n• 🏃‍♂️ 운동 및 생활습관 팁\n\n무엇을 도와드릴까요?`,
+    timestamp: new Date().toISOString(),
+  });
+
   const loadChatHistory = async () => {
     try {
-      // Check if Supabase is configured
-      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        console.log('Supabase not configured, showing welcome message');
-        setMessages([
-          {
-            id: 'welcome',
-            role: 'assistant',
-            content: `안녕하세요, ${userProfile.name}님! 😊\n\n저는 건강한 식단 관리를 도와드리는 AI 영양 상담사입니다.\n\n다음과 같은 도움을 드릴 수 있어요:\n• 🍽️ 맞춤 식사 메뉴 추천\n• 📊 칼로리 및 영양소 분석\n• 💪 건강 목표 달성 조언\n• 🏃‍♂️ 운동 및 생활습관 팁\n\n무엇을 도와드릴까요?`,
-            timestamp: new Date().toISOString(),
-          }
-        ]);
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/make-server-4e0538b1/chat/${userProfile.userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const history = await response.json();
+      const history = await chatService.getHistory(userProfile.userId);
+      if (history && history.length > 0) {
         setMessages(history);
-      }
-
-      // If no history, send welcome message
-      if (messages.length === 0) {
-        setMessages([
-          {
-            id: 'welcome',
-            role: 'assistant',
-            content: `안녕하세요, ${userProfile.name}님! 😊\n\n저는 건강한 식단 관리를 도와드리는 AI 영양 상담사입니다.\n\n다음과 같은 도움을 드릴 수 있어요:\n• 🍽️ 맞춤 식사 메뉴 추천\n• 📊 칼로리 및 영양소 분석\n• 💪 건강 목표 달성 조언\n• 🏃‍♂️ 운동 및 생활습관 팁\n\n무엇을 도와드릴까요?`,
-            timestamp: new Date().toISOString(),
-          }
-        ]);
+      } else {
+        setMessages([getWelcomeMessage()]);
       }
     } catch (error) {
-      console.error('Error loading chat history:', error);
-      // Show welcome message on error
-      setMessages([
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: `안녕하세요, ${userProfile.name}님! 😊\n\n저는 건강한 식단 관리를 도와드리는 AI 영양 상담사입니다.\n\n다음과 같은 도움을 드릴 수 있어요:\n• 🍽️ 맞춤 식사 메뉴 추천\n• 📊 칼로리 및 영양소 분석\n• 💪 건강 목표 달성 조언\n• 🏃‍♂️ 운동 및 생활습관 팁\n\n무엇을 도와드릴까요?`,
-          timestamp: new Date().toISOString(),
-        }
-      ]);
+      console.warn('채팅 기록 로드 실패 (백엔드 미연결):', error);
+      setMessages([getWelcomeMessage()]);
     }
   };
 
@@ -95,7 +62,6 @@ export function ChatbotScreen({ userProfile }: ChatbotScreenProps) {
     setInputMessage('');
     setIsLoading(true);
 
-    // Add user message immediately
     const newUserMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -106,50 +72,29 @@ export function ChatbotScreen({ userProfile }: ChatbotScreenProps) {
     setMessages(prev => [...prev, newUserMessage]);
 
     try {
-      // Check if Supabase is configured
-      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        // Generate mock response without API
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: '죄송합니다. 현재 AI 챗봇 기능은 Supabase 연결이 필요합니다. 연결 후 다시 시도해주세요.',
-          timestamp: new Date().toISOString(),
-        }]);
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/make-server-4e0538b1/chat`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            userId: userProfile.userId,
-            message: userMessage,
-            userProfile,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const { message } = await response.json();
-        setMessages(prev => [...prev, message]);
-      }
+      const profileForRequest: Record<string, unknown> = {
+        name: userProfile.name,
+        goal: userProfile.goal,
+        targetCalories: userProfile.targetCalories,
+        currentCalories: userProfile.currentCalories,
+        weight: userProfile.weight,
+      };
+      const result = await chatService.sendMessage(userProfile.userId, userMessage, profileForRequest);
+      setMessages(prev => [...prev, result.message]);
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: '죄송합니다. 일시적인 오류가 발생했습니다. 다시 시도해주세요.',
+        content: '죄송합니다. 현재 AI 상담사 서버에 연결할 수 없어요. 백엔드 서버가 실행 중인지 확인해 주세요.',
         timestamp: new Date().toISOString(),
       }]);
     } finally {
       setIsLoading(false);
     }
   };
+
+
 
   const quickActions = [
     '오늘 점심 메뉴 추천해줘',
@@ -181,11 +126,10 @@ export function ChatbotScreen({ userProfile }: ChatbotScreenProps) {
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                message.role === 'user'
+              className={`max-w-[80%] rounded-2xl px-4 py-3 ${message.role === 'user'
                   ? 'bg-green-600 text-white rounded-br-sm'
                   : 'bg-white text-gray-900 rounded-bl-sm shadow-sm'
-              }`}
+                }`}
             >
               {message.role === 'assistant' && (
                 <div className="flex items-center gap-2 mb-2">

@@ -4,6 +4,7 @@ import { Plus, X, Search, ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { mealService } from '../api/apiClient';
 
 interface MealLogScreenProps {
   userProfile: UserProfile;
@@ -27,12 +28,8 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
   const handleAddMeal = async () => {
     if (!formData.foodName || !formData.calories) return;
 
-    const today = new Date().toISOString().split('T')[0];
-    
     const newMeal: Meal = {
       id: crypto.randomUUID(),
-      userId: userProfile.userId,
-      date: today,
       mealType: formData.mealType,
       foodName: formData.foodName,
       calories: parseInt(formData.calories),
@@ -44,45 +41,27 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
     };
 
     try {
-      // Check if Supabase is configured
-      if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/make-server-4e0538b1/meals`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
-              userId: userProfile.userId,
-              date: today,
-              mealType: formData.mealType,
-              foodName: formData.foodName,
-              calories: parseInt(formData.calories),
-              protein: parseInt(formData.protein) || 0,
-              carbs: parseInt(formData.carbs) || 0,
-              fat: parseInt(formData.fat) || 0,
-              restaurantLink: formData.restaurantLink,
-            }),
-          }
-        );
-
-        if (response.ok) {
-          const { meal } = await response.json();
-          newMeal.id = meal.id;
-        }
-      } else {
-        console.log('Supabase not configured, using local data only');
-      }
+      // Send to FastAPI backend
+      const saved = await mealService.createMeal({
+        user_id: userProfile.userId,
+        meal_type: formData.mealType,
+        food_name: formData.foodName,
+        calories: parseInt(formData.calories),
+        protein: parseInt(formData.protein) || 0,
+        carbs: parseInt(formData.carbs) || 0,
+        fat: parseInt(formData.fat) || 0,
+        restaurant_link: formData.restaurantLink || undefined,
+        timestamp: new Date().toISOString(),
+      });
+      // Use server-assigned ID if available
+      if (saved?.id) newMeal.id = saved.id;
     } catch (error) {
-      console.error('Error adding meal:', error);
+      console.warn('식사 기록 백엔드 저장 실패 (로컬 저장):', error);
     } finally {
-      // Always add meal locally
+      // Always add meal locally regardless of backend result
       setTodaysMeals([...todaysMeals, newMeal]);
       updateCurrentCalories(newMeal.calories);
-      
-      // Reset form
+
       setFormData({
         mealType: 'lunch',
         foodName: '',
@@ -95,6 +74,7 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
       setShowAddModal(false);
     }
   };
+
 
   const handleDeleteMeal = async (meal: Meal) => {
     try {
@@ -271,11 +251,10 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
                     <button
                       key={type.value}
                       onClick={() => setFormData({ ...formData, mealType: type.value as any })}
-                      className={`p-3 rounded-lg border-2 transition-all ${
-                        formData.mealType === type.value
+                      className={`p-3 rounded-lg border-2 transition-all ${formData.mealType === type.value
                           ? 'border-green-600 bg-green-50'
                           : 'border-gray-200'
-                      }`}
+                        }`}
                     >
                       <div className="text-xl mb-1">{type.emoji}</div>
                       <div className="text-xs">{type.label}</div>

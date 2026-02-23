@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -31,11 +31,33 @@ export interface UserProfile {
     target_weight?: number;
 }
 
-export interface Recommendation {
-    food_name: string;
+export interface Restaurant {
+    id: string;
+    name: string;
+    category: string;
+    distance: number;
+    rating: number;
+    reviewCount: number;
+    signature: string;
+    signatureCalories: number;
+    price: string;
+    deliveryTime: string;
+    naverLink: string;
+    baeminLink?: string;
+    yogiyoLink?: string;
+    imageUrl: string;
     reason: string;
-    calories: number;
-    restaurant: string;
+    protein: number;
+    carbs: number;
+    fat: number;
+    address: string;
+}
+
+export interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
 }
 
 export const mealService = {
@@ -63,8 +85,25 @@ export const profileService = {
 };
 
 export const recommendService = {
-    getRecommendations: async (userId: string) => {
-        const response = await apiClient.get<Recommendation[]>(`/recommend/${userId}`);
+    getRecommendations: async (userId: string, lat?: number, lng?: number) => {
+        const response = await apiClient.get<Restaurant[]>(`/recommend/${userId}`, {
+            params: { lat, lng },
+        });
+        return response.data;
+    },
+};
+
+export const chatService = {
+    getHistory: async (userId: string) => {
+        const response = await apiClient.get<ChatMessage[]>(`/chat/history/${userId}`);
+        return response.data;
+    },
+    sendMessage: async (userId: string, message: string, userProfile: Record<string, unknown>) => {
+        const response = await apiClient.post<{ message: ChatMessage }>('/chat/message', {
+            user_id: userId,
+            message,
+            user_profile: userProfile,
+        });
         return response.data;
     },
 };

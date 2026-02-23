@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { UserProfile } from '../App';
 import { MapPin, Star, ExternalLink, Check, ChevronLeft, ChevronRight, RefreshCw, Navigation, Car, MapPinned, ArrowRight, Sparkles, Zap, MessageCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -6,6 +6,8 @@ import { Button } from './ui/button';
 import { RecommendationLoadingScreen } from './RecommendationLoadingScreen';
 import { FeedbackModal } from './FeedbackModal';
 import { RestaurantRecommendationCardView } from './RestaurantRecommendationCardView';
+import { recommendService } from '../api/apiClient';
+
 
 interface RestaurantRecommendationScreenNewProps {
   userProfile: UserProfile;
@@ -146,8 +148,8 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
     }
   };
 
-  const generateRecommendations = (isQuick: boolean) => {
-    const mockRestaurants: Restaurant[] = [
+  const generateRecommendations = async (isQuick: boolean) => {
+    const MOCK_RESTAURANTS: Restaurant[] = [
       {
         id: '1',
         name: '밥도둑 제육볶음',
@@ -163,7 +165,7 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
         baeminLink: 'https://www.baemin.com',
         yogiyoLink: 'https://www.yogiyo.co.kr',
         imageUrl: 'https://images.unsplash.com/photo-1624300629298-e9de39c13be5?w=400&h=300&fit=crop',
-        reason: isQuick ? '지금 주변에서 가장 인기있는 매뉴!' : `${selectedEmotion}할 때 딱 좋은 든든한 한 끼!`,
+        reason: isQuick ? '지금 주변에서 가장 인기있는 메뉴!' : `${selectedEmotion}할 때 딱 좋은 든든한 한 끼!`,
         protein: 38,
         carbs: 75,
         fat: 22,
@@ -212,9 +214,26 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
       },
     ];
 
-    setRestaurants(mockRestaurants);
+    try {
+      const data = await recommendService.getRecommendations(
+        userProfile.userId,
+        userLocationData?.lat,
+        userLocationData?.lng
+      );
+      if (data && data.length > 0) {
+        setRestaurants(data);
+        setQuestionStep('result');
+        return;
+      }
+    } catch (err) {
+      console.warn('추천 API 호출 실패, 로컬 데이터 사용:', err);
+    }
+
+    // Fallback to mock data
+    setRestaurants(MOCK_RESTAURANTS);
     setQuestionStep('result');
   };
+
 
   const getCurrentStepNumber = () => {
     switch (questionStep) {
