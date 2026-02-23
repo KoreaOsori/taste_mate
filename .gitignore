@@ -1,8 +1,41 @@
-.venv/
-.env
-__pycache__/
-*.pyc
-logs/
-output/
-*.jsonl
+# Common
 .DS_Store
+Thumbs.db
+
+# Frontend (React/Vite)
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vscode/
+.idea/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Backend (Python/FastAPI)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.*
+!.env.example
+*.log
+output/
+.pytest_cache/
+.mypy_cache/
+
+# Git
+.git/
+!.git/
+
+# Build and local configs
+build/
+bin/
+obj/

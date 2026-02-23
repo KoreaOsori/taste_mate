@@ -1,0 +1,358 @@
+import { useState } from 'react';
+import { UserProfile } from '../App';
+import { User, Settings, Bell, Lock, HelpCircle, LogOut, ChevronRight, Edit2, MapPin, Globe, Shield } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { getSupabaseConfig } from '../utils/supabase-config';
+
+interface ProfileScreenProps {
+  userProfile: UserProfile;
+  setUserProfile: (profile: UserProfile) => void;
+  onLogout: () => void;
+}
+
+export function ProfileScreen({ userProfile, setUserProfile, onLogout }: ProfileScreenProps) {
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [formData, setFormData] = useState({
+    name: userProfile.name,
+    age: userProfile.age.toString(),
+    height: userProfile.height.toString(),
+    weight: userProfile.weight.toString(),
+    targetWeight: userProfile.targetWeight.toString(),
+    breakfastTime: userProfile.breakfastTime,
+    lunchTime: userProfile.lunchTime,
+    dinnerTime: userProfile.dinnerTime,
+  });
+
+  const handleSave = async () => {
+    const updatedProfile = {
+      ...userProfile,
+      name: formData.name,
+      age: parseInt(formData.age),
+      height: parseInt(formData.height),
+      weight: parseInt(formData.weight),
+      targetWeight: parseInt(formData.targetWeight),
+      breakfastTime: formData.breakfastTime,
+      lunchTime: formData.lunchTime,
+      dinnerTime: formData.dinnerTime,
+    };
+
+    try {
+      const { url, key, isConfigured } = getSupabaseConfig();
+      
+      if (isConfigured) {
+        const response = await fetch(
+          `${url}/functions/v1/make-server-4e0538b1/profile/${userProfile.userId}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${key}`,
+            },
+            body: JSON.stringify(updatedProfile),
+          }
+        );
+
+        if (!response.ok) {
+          console.warn('Failed to update profile on backend');
+        }
+      }
+      
+      // Update local state regardless
+      setUserProfile(updatedProfile);
+      setShowEditModal(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      // Still update local state
+      setUserProfile(updatedProfile);
+      setShowEditModal(false);
+    }
+  };
+
+  const bmi = (userProfile.weight / Math.pow(userProfile.height / 100, 2)).toFixed(1);
+  let bmiCategory = '';
+  if (parseFloat(bmi) < 18.5) bmiCategory = '저체중';
+  else if (parseFloat(bmi) < 23) bmiCategory = '정상';
+  else if (parseFloat(bmi) < 25) bmiCategory = '과체중';
+  else bmiCategory = '비만';
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-gradient-to-br from-green-600 to-green-700 text-white px-6 pt-4 pb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold">프로필</h1>
+          <button 
+            onClick={() => setShowEditModal(true)}
+            className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Profile Card */}
+      <div className="px-4 -mt-6">
+        <div className="bg-white rounded-2xl shadow-lg p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
+              {userProfile.name.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-bold text-gray-900 truncate">{userProfile.name}</h2>
+              <p className="text-sm text-gray-600">{userProfile.age}세 · {userProfile.gender === 'male' ? '남성' : '여성'}</p>
+              <p className="text-xs text-green-600 mt-0.5 truncate">
+                목표: {userProfile.goal === 'lose' ? '체중 감량' : userProfile.goal === 'gain' ? '체중 증가' : '중 유지'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100">
+            <div className="text-center">
+              <p className="text-xs text-gray-600 mb-0.5">키</p>
+              <p className="text-base font-bold text-gray-900">{userProfile.height}cm</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-600 mb-0.5">체중</p>
+              <p className="text-base font-bold text-gray-900">{userProfile.weight}kg</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-600 mb-0.5">BMI</p>
+              <p className="text-base font-bold text-green-600">{bmi}</p>
+            </div>
+          </div>
+
+          <div className="mt-3 px-3 py-2.5 bg-green-50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-600">BMI 상태</p>
+                <p className="text-sm font-medium text-green-700">{bmiCategory}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-600">목표 칼로리</p>
+                <p className="text-sm font-bold text-green-700">{userProfile.targetCalories} kcal</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Health Info */}
+      <div className="px-4 py-4">
+        <h3 className="text-sm font-bold text-gray-900 mb-2">건강 정보</h3>
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="p-3.5 flex items-center justify-between border-b border-gray-100">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">목표 체중</p>
+              <p className="text-xs text-gray-600 mt-0.5">{userProfile.targetWeight}kg</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </div>
+          <div className="p-3.5 flex items-center justify-between border-b border-gray-100">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">활동 수준</p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                {userProfile.activityLevel === 'sedentary' ? '거의 운동 안함' :
+                 userProfile.activityLevel === 'light' ? '가벼운 운동' :
+                 userProfile.activityLevel === 'moderate' ? '중간 운동' :
+                 userProfile.activityLevel === 'active' ? '적극적 운동' : '매우 적극적'}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </div>
+          <div className="p-3.5 flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900">식사 시간</p>
+              <p className="text-xs text-gray-600 mt-0.5 truncate">
+                아침 {userProfile.breakfastTime} · 점심 {userProfile.lunchTime} · 저녁 {userProfile.dinnerTime}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
+          </div>
+        </div>
+      </div>
+
+      {/* Settings */}
+      <div className="px-4 pb-4">
+        <h3 className="text-sm font-bold text-gray-900 mb-2">설정</h3>
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <button className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2.5">
+              <Bell className="w-4 h-4 text-gray-600 flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-900">알림 설정</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+          <button className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2.5">
+              <MapPin className="w-4 h-4 text-gray-600 flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-900">위치 서비스</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+          <button className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2.5">
+              <Lock className="w-4 h-4 text-gray-600 flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-900">개인정보 보호</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+          <button className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2.5">
+              <Globe className="w-4 h-4 text-gray-600 flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-900">언어 설정</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+          <button className="w-full p-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2.5">
+              <HelpCircle className="w-4 h-4 text-gray-600 flex-shrink-0" />
+              <span className="text-sm font-medium text-gray-900">도움말 및 지원</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </button>
+        </div>
+      </div>
+
+      {/* App Info & Logout */}
+      <div className="px-4 pb-24">
+        <div className="bg-gray-100 rounded-xl p-3 text-center mb-3">
+          <p className="text-xs text-gray-600 mb-1">밥친구 v1.0.0</p>
+          <div className="flex items-center justify-center gap-3 text-xs text-gray-500">
+            <button className="hover:text-green-600 transition-colors">이용약관</button>
+            <span>·</span>
+            <button className="hover:text-green-600 transition-colors">개인정보처리방침</button>
+          </div>
+        </div>
+
+        <Button
+          onClick={onLogout}
+          variant="outline"
+          className="w-full h-11 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          로그아웃
+        </Button>
+      </div>
+
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-3xl">
+              <h2 className="text-xl font-bold">프로필 수정</h2>
+              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                <User className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <Label htmlFor="edit-name">이름</Label>
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-age">나이</Label>
+                  <Input
+                    id="edit-age"
+                    type="number"
+                    value={formData.age}
+                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-height">키 (cm)</Label>
+                  <Input
+                    id="edit-height"
+                    type="number"
+                    value={formData.height}
+                    onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-weight">체중 (kg)</Label>
+                  <Input
+                    id="edit-weight"
+                    type="number"
+                    value={formData.weight}
+                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-target">목표 체중 (kg)</Label>
+                  <Input
+                    id="edit-target"
+                    type="number"
+                    value={formData.targetWeight}
+                    onChange={(e) => setFormData({ ...formData, targetWeight: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>식사 시간</Label>
+                <div className="grid grid-cols-3 gap-3 mt-2">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">아침</p>
+                    <Input
+                      type="time"
+                      value={formData.breakfastTime}
+                      onChange={(e) => setFormData({ ...formData, breakfastTime: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">점심</p>
+                    <Input
+                      type="time"
+                      value={formData.lunchTime}
+                      onChange={(e) => setFormData({ ...formData, lunchTime: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">저녁</p>
+                    <Input
+                      type="time"
+                      value={formData.dinnerTime}
+                      onChange={(e) => setFormData({ ...formData, dinnerTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  onClick={() => setShowEditModal(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  저장
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
