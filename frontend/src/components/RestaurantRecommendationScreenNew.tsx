@@ -547,9 +547,11 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
       <>
         <RestaurantRecommendationCardView
           restaurants={restaurants}
-          userProfile={userProfile}
-          onBack={handleBack}
-          onOrderClick={handleOrderClick}
+          onSelectRestaurant={handleOrderClick}
+          onShowFeedback={(restaurant) => {
+            setFeedbackRestaurant(restaurant);
+            setShowFeedbackModal(true);
+          }}
         />
 
         {/* Order Confirmation Modal */}

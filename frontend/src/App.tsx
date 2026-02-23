@@ -92,7 +92,7 @@ export default function App() {
     try {
       // Check if Supabase is configured
       const { url, key, isConfigured } = getSupabaseConfig();
-      
+
       if (!isConfigured) {
         console.log('Supabase not configured, using local data only');
         return;
@@ -106,7 +106,7 @@ export default function App() {
           },
         }
       );
-      
+
       if (response.ok) {
         const profile = await response.json();
         setUserProfile(profile);
@@ -184,14 +184,14 @@ export default function App() {
       {/* Main content */}
       <div className={currentScreen === 'login' || currentScreen === 'signup' || currentScreen === 'location' || currentScreen === 'onboarding' ? '' : 'pb-20'}>
         {currentScreen === 'login' && (
-          <LoginScreen 
-            onLoginSuccess={handleLoginSuccess} 
+          <LoginScreen
+            onLoginSuccess={handleLoginSuccess}
             onSignupClick={() => setCurrentScreen('signup')}
             onGuestLogin={handleGuestLogin}
           />
         )}
         {currentScreen === 'signup' && (
-          <SignupScreen 
+          <SignupScreen
             onComplete={handleSignupComplete}
             onLoginClick={() => setCurrentScreen('login')}
           />
@@ -200,14 +200,14 @@ export default function App() {
           <LocationPermissionScreen onComplete={handleLocationComplete} />
         )}
         {currentScreen === 'onboarding' && (
-          <OnboardingScreenNew 
+          <OnboardingScreenNew
             onComplete={handleOnboardingComplete}
             userName={signupData?.name}
           />
         )}
         {currentScreen === 'home' && userProfile && (
-          <DashboardHome 
-            userProfile={userProfile} 
+          <DashboardHome
+            userProfile={userProfile}
             onNavigate={setCurrentScreen}
             todaysMeals={todaysMeals}
           />
@@ -219,8 +219,8 @@ export default function App() {
           <CommunityScreen userProfile={userProfile} />
         )}
         {currentScreen === 'meal-log' && userProfile && (
-          <MealLogScreen 
-            userProfile={userProfile} 
+          <MealLogScreen
+            userProfile={userProfile}
             todaysMeals={todaysMeals}
             setTodaysMeals={setTodaysMeals}
             updateCurrentCalories={updateCurrentCalories}
@@ -236,14 +236,14 @@ export default function App() {
           <CalendarScreenWithReport userProfile={userProfile} onNavigate={setCurrentScreen} />
         )}
         {currentScreen === 'health-report' && userProfile && (
-          <HealthReportScreen 
-            userProfile={userProfile} 
+          <HealthReportScreen
+            userProfile={userProfile}
             onBack={() => setCurrentScreen('calendar')}
           />
         )}
         {currentScreen === 'profile' && userProfile && (
-          <ProfileScreen 
-            userProfile={userProfile} 
+          <ProfileScreen
+            userProfile={userProfile}
             setUserProfile={setUserProfile}
             onLogout={() => {
               localStorage.removeItem('tastemate_userId');
@@ -262,24 +262,22 @@ export default function App() {
           <div className="flex justify-around items-center max-w-md mx-auto">
             <button
               onClick={() => setCurrentScreen('home')}
-              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
-                currentScreen === 'home' ? 'text-green-600' : 'text-gray-500'
-              }`}
+              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${currentScreen === 'home' ? 'text-green-600' : 'text-gray-500'
+                }`}
             >
               <Home className="w-5 h-5" />
               <span className="text-xs">홈</span>
             </button>
-            
+
             <button
               onClick={() => setCurrentScreen('calendar')}
-              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
-                currentScreen === 'calendar' ? 'text-green-600' : 'text-gray-500'
-              }`}
+              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${currentScreen === 'calendar' ? 'text-green-600' : 'text-gray-500'
+                }`}
             >
               <Calendar className="w-5 h-5" />
               <span className="text-xs">캘린더</span>
             </button>
-            
+
             <button
               onClick={() => setCurrentScreen('restaurant')}
               className="flex flex-col items-center gap-1 px-3 py-2 rounded-full text-white bg-green-600 -mt-4 shadow-lg"
@@ -287,22 +285,20 @@ export default function App() {
               <Utensils className="w-7 h-7" />
               <span className="text-xs">추천</span>
             </button>
-            
+
             <button
               onClick={() => setCurrentScreen('community')}
-              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
-                currentScreen === 'community' ? 'text-green-600' : 'text-gray-500'
-              }`}
+              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${currentScreen === 'community' ? 'text-green-600' : 'text-gray-500'
+                }`}
             >
               <Users className="w-5 h-5" />
               <span className="text-xs">커뮤니티</span>
             </button>
-            
+
             <button
               onClick={() => setCurrentScreen('profile')}
-              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${
-                currentScreen === 'profile' ? 'text-green-600' : 'text-gray-500'
-              }`}
+              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${currentScreen === 'profile' ? 'text-green-600' : 'text-gray-500'
+                }`}
             >
               <User className="w-5 h-5" />
               <span className="text-xs">프로필</span>
