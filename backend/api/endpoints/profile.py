@@ -15,9 +15,14 @@ class UserProfile(BaseModel):
     target_weight: Optional[float] = None
     target_calories: Optional[int] = None
     current_calories: int = 0
+    breakfast_time: Optional[str] = None
+    lunch_time: Optional[str] = None
+    dinner_time: Optional[str] = None
     activity_level: Optional[str] = None
     goal: Optional[str] = None
     preferred_categories: List[str] = []
+    disliked_foods: List[str] = []
+    restricted_foods: List[str] = []
 
 from db.supabase_client import get_supabase_client
 supabase = get_supabase_client()

@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
+    timeout: 5000,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -25,10 +26,22 @@ export interface MealRecord {
 export interface UserProfile {
     user_id: string;
     name: string;
+    age: number;
+    gender: 'male' | 'female' | 'other';
+    height: number;
+    weight: number;
+    target_weight?: number;
     target_calories: number;
     current_calories: number;
-    weight?: number;
-    target_weight?: number;
+    breakfast_time?: string;
+    lunch_time?: string;
+    dinner_time?: string;
+    activity_level: 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
+    goal: 'lose' | 'balanced' | 'gain';
+    preferred_categories: string[];
+    disliked_foods?: string[];
+    restricted_foods?: string[];
+    location?: string;
 }
 
 export interface Restaurant {

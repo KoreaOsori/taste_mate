@@ -10,7 +10,7 @@ interface HealthReportScreenProps {
 
 export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenProps) {
   const [selectedTab, setSelectedTab] = useState<'basic' | 'premium'>('basic');
-  
+
   // Mock analysis data
   const weeklyAverage = 1920;
   const proteinAverage = 75;
@@ -36,7 +36,7 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
     {
       type: 'protein',
       status: proteinAverage < targetProtein ? 'increase' : 'good',
-      message: proteinAverage < targetProtein 
+      message: proteinAverage < targetProtein
         ? '단백질 섭취를 조금 더 늘려보세요'
         : '단백질 섭취가 적절합니다',
       foods: ['닭가슴살', '계란', '두부', '연어'],
@@ -132,11 +132,10 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
         <div className="flex gap-3">
           <button
             onClick={() => setSelectedTab('basic')}
-            className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-              selectedTab === 'basic'
+            className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${selectedTab === 'basic'
                 ? 'bg-white text-green-600 shadow-lg'
                 : 'bg-white/20 text-white hover:bg-white/30'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-center gap-2">
               <ChartBar className="w-5 h-5" />
@@ -145,11 +144,10 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
           </button>
           <button
             onClick={() => setSelectedTab('premium')}
-            className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
-              selectedTab === 'premium'
+            className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${selectedTab === 'premium'
                 ? 'bg-white text-green-600 shadow-lg'
                 : 'bg-white/20 text-white hover:bg-white/30'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-center gap-2">
               <Crown className="w-5 h-5" />
@@ -187,19 +185,19 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                   <span className="text-sm text-gray-600">평균 칼로리</span>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-gray-900">{weeklyAverage}kcal</span>
-                    {weeklyAverage < userProfile.targetCalories ? (
+                    {weeklyAverage < userProfile.target_calories ? (
                       <TrendingDown className="w-4 h-4 text-blue-600" />
                     ) : (
                       <TrendingUp className="w-4 h-4 text-red-600" />
                     )}
                   </div>
                 </div>
-                <Progress 
-                  value={(weeklyAverage / userProfile.targetCalories) * 100} 
+                <Progress
+                  value={(weeklyAverage / userProfile.target_calories) * 100}
                   className="h-2"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  목표: {userProfile.targetCalories}kcal
+                  목표: {userProfile.target_calories}kcal
                 </p>
               </div>
             </div>
@@ -215,8 +213,8 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                   <span className="text-sm text-gray-600">단백질</span>
                   <span className="font-bold text-gray-900">{proteinAverage}g / {targetProtein}g</span>
                 </div>
-                <Progress 
-                  value={(proteinAverage / targetProtein) * 100} 
+                <Progress
+                  value={(proteinAverage / targetProtein) * 100}
                   className="h-2"
                 />
               </div>
@@ -227,8 +225,8 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                   <span className="text-sm text-gray-600">탄수화물</span>
                   <span className="font-bold text-gray-900">{carbsAverage}g / {targetCarbs}g</span>
                 </div>
-                <Progress 
-                  value={(carbsAverage / targetCarbs) * 100} 
+                <Progress
+                  value={(carbsAverage / targetCarbs) * 100}
                   className="h-2"
                 />
               </div>
@@ -239,8 +237,8 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                   <span className="text-sm text-gray-600">지방</span>
                   <span className="font-bold text-gray-900">{fatAverage}g / {targetFat}g</span>
                 </div>
-                <Progress 
-                  value={(fatAverage / targetFat) * 100} 
+                <Progress
+                  value={(fatAverage / targetFat) * 100}
                   className="h-2"
                 />
               </div>
@@ -263,7 +261,7 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                 <div>
                   <p className="font-medium text-gray-900">다양한 음식</p>
                   <p className="text-sm text-gray-600">
-                    {userProfile.preferredCategories.length}개 카테고리를 즐기고 계시네요
+                    {userProfile.preferred_categories.length}개 카테고리를 즐기고 계시네요
                   </p>
                 </div>
               </div>
@@ -281,7 +279,7 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
               {recommendations.map((rec, index) => {
                 const Icon = rec.status === 'good' ? CheckCircle : AlertCircle;
                 const iconColor = rec.status === 'good' ? 'text-green-600' : 'text-orange-600';
-                
+
                 return (
                   <div key={index} className="bg-white/60 rounded-lg p-4">
                     <div className="flex items-start gap-3 mb-3">
@@ -429,7 +427,7 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                 <p className="text-gray-900 font-medium mb-2">현미밥 + 계란찜 + 시금치나물</p>
                 <p className="text-sm text-gray-600">단백질 중심의 든든한 아침 식사로 하루를 시작하세요</p>
               </div>
-              
+
               <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-5 border-2 border-blue-200">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-bold text-blue-700">점심</span>
@@ -438,7 +436,7 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                 <p className="text-gray-900 font-medium mb-2">닭가슴살 샐러드 + 퀴노아</p>
                 <p className="text-sm text-gray-600">활동량이 많은 오후를 위한 영양 균형식</p>
               </div>
-              
+
               <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-5 border-2 border-orange-200">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-bold text-orange-700">저녁</span>
@@ -466,7 +464,7 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-white/80 rounded-xl p-4 border border-green-100">
                 <div className="flex items-start gap-3">
                   <div className="w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
@@ -503,11 +501,11 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                 </div>
               </div>
               <p className="text-sm text-gray-600 bg-indigo-50 rounded-lg p-4 border border-indigo-200 mt-4">
-                {userProfile.goal === 'lose' 
+                {userProfile.goal === 'lose'
                   ? '💪 다이어트 목표를 향해 꾸준히 노력하고 계시네요! 이대로만 유지하시면 2주 내에 목표 체중에 도달할 수 있습니다.'
                   : userProfile.goal === 'gain'
-                  ? '🏋️ 영양 보충 목표를 순조롭게 달성하고 있습니다! 단백질 섭취를 조금 더 늘리면 더 좋은 결과를 얻을 수 있어요.'
-                  : '⚖️ 균형잡힌 식습관을 훌륭하게 유지하고 계세요! 현재 패턴을 계속 이어가시면 건강한 생활을 오래 유지하실 수 있습니다.'}
+                    ? '🏋️ 영양 보충 목표를 순조롭게 달성하고 있습니다! 단백질 섭취를 조금 더 늘리면 더 좋은 결과를 얻을 수 있어요.'
+                    : '⚖️ 균형잡힌 식습관을 훌륭하게 유지하고 계세요! 현재 패턴을 계속 이어가시면 건강한 생활을 오래 유지하실 수 있습니다.'}
               </p>
             </div>
           </div>

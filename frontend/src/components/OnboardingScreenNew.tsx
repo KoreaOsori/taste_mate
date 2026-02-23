@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { getSupabaseConfig } from '../utils/supabase-config';
+import { profileService } from '../api/apiClient';
 
 interface OnboardingScreenProps {
   onComplete: (profile: UserProfile) => void;
@@ -33,11 +34,15 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
     name: userName,
     age: '',
     gender: 'male' as 'male' | 'female' | 'other',
+    height: '',
+    weight: '',
     breakfastTime: '08:00',
     lunchTime: '12:00',
     dinnerTime: '18:00',
     preferredCategories: [] as string[],
+    dislikedFoods: '',
     healthGoal: 'balanced' as 'lose' | 'balanced' | 'gain',
+    activityLevel: 'moderate' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active',
   });
 
   const toggleCategory = (categoryId: string) => {
@@ -54,120 +59,137 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
     }
   };
 
+  const calculateTargetCalories = () => {
+    const weightNum = parseInt(formData.weight) || 70;
+    const heightNum = parseInt(formData.height) || 170;
+    const ageNum = parseInt(formData.age) || 25;
+
+    // Harris-Benedict Equation (Simplified)
+    let bmr = 0;
+    if (formData.gender === 'male') {
+      bmr = 88.36 + (13.4 * weightNum) + (4.8 * heightNum) - (5.7 * ageNum);
+    } else {
+      bmr = 447.6 + (9.2 * weightNum) + (3.1 * heightNum) - (4.3 * ageNum);
+    }
+
+    const activityMultipliers = {
+      sedentary: 1.2,
+      light: 1.375,
+      moderate: 1.55,
+      active: 1.725,
+      'very-active': 1.9,
+    };
+
+    let tdee = bmr * activityMultipliers[formData.activityLevel];
+
+    if (formData.healthGoal === 'lose') tdee -= 500;
+    if (formData.healthGoal === 'gain') tdee += 500;
+
+    return Math.round(tdee);
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    
-    const profile: UserProfile = {
-      userId: crypto.randomUUID(),
+
+    const targetCalories = calculateTargetCalories();
+
+    const profile: any = {
+      user_id: crypto.randomUUID(),
       name: formData.name,
       age: parseInt(formData.age) || 25,
       gender: formData.gender,
-      height: 170,
-      weight: 65,
-      targetWeight: 65,
-      targetCalories: 2000,
-      currentCalories: 0,
-      breakfastTime: formData.breakfastTime,
-      lunchTime: formData.lunchTime,
-      dinnerTime: formData.dinnerTime,
-      activityLevel: 'moderate',
+      height: parseInt(formData.height) || 170,
+      weight: parseInt(formData.weight) || 65,
+      target_weight: parseInt(formData.weight) || 65,
+      target_calories: targetCalories,
+      current_calories: 0,
+      breakfast_time: formData.breakfastTime,
+      lunch_time: formData.lunchTime,
+      dinner_time: formData.dinnerTime,
+      activity_level: formData.activityLevel,
       goal: formData.healthGoal,
-      preferredCategories: formData.preferredCategories,
-      location: '', // Will be updated by geolocation
+      preferred_categories: formData.preferredCategories,
+      disliked_foods: formData.dislikedFoods.split(',').map(s => s.trim()).filter(s => s !== ''),
+      location: '',
     };
 
     try {
-      const { url, key, isConfigured } = getSupabaseConfig();
-      
-      if (isConfigured) {
-        const response = await fetch(
-          `${url}/functions/v1/make-server-4e0538b1/profile`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-            },
-            body: JSON.stringify(profile),
-          }
-        );
-
-        if (!response.ok) {
-          console.warn('Failed to save profile to backend, continuing with local data');
-        }
-      } else {
-        console.log('Supabase not configured, using local data only');
-      }
+      // Create/Update profile via backend API
+      const response = await profileService.updateProfile(profile.user_id, profile);
+      console.log('Profile saved to DB via backend:', response);
     } catch (error) {
-      console.error('Error saving profile:', error);
-      console.log('Continuing with local data only');
+      console.error('Error saving profile via backend:', error);
+      console.warn('Continuing with local storage fallback');
     } finally {
       setIsSubmitting(false);
-      onComplete(profile);
+      onComplete(profile as unknown as UserProfile);
     }
   };
 
-  return (
-    <div className="h-screen overflow-hidden bg-gradient-to-b from-green-50 to-white flex flex-col">
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-md mx-auto">
-          {/* Progress bar */}
-          <div className="mb-6">
-            <div className="flex justify-between mb-2">
-              <span className="text-sm text-gray-600">단계 {step}/3</span>
-              <span className="text-sm text-green-600 font-medium">{Math.round((step / 3) * 100)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(step / 3) * 100}%` }}
-              ></div>
-            </div>
-          </div>
+  const totalSteps = 4;
 
-          {/* Step 1: Basic Info */}
+  return (
+    <div className="h-screen flex flex-col bg-white">
+      {/* Header & Progress (Fixed) */}
+      <div className="bg-white px-6 pt-8 pb-4 border-b border-gray-100 flex-none">
+        <div className="max-w-md mx-auto">
+          <div className="flex justify-between items-end mb-2">
+            <div>
+              <span className="text-xs font-bold text-green-600 tracking-wider">ONBOARDING</span>
+              <h2 className="text-lg font-bold text-gray-900">단계 {step}/{totalSteps}</h2>
+            </div>
+            <span className="text-sm font-bold text-green-600">{Math.round((step / totalSteps) * 100)}%</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="bg-green-600 h-full transition-all duration-500 ease-out"
+              style={{ width: `${(step / totalSteps) * 100}%` }}
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content (Scrollable) */}
+      <div className="flex-1 overflow-y-auto px-6 py-8">
+        <div className="max-w-md mx-auto">
           {step === 1 && (
-            <div className="space-y-5">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Utensils className="w-8 h-8 text-green-600" />
-                </div>
-                <h1 className="text-xl font-bold text-gray-900 mb-1">기본 정보</h1>
-                <p className="text-sm text-gray-600">맞춤 추천을 위해 알려주세요</p>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-bold text-gray-900">기본 신체 정보</h1>
+                <p className="text-sm text-gray-500">정확한 영양 분석을 위해 반드시 필요해요 (필수)</p>
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">이름</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-gray-700 font-medium">이름</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="홍길동"
-                    className="mt-1"
+                    className="h-12 border-gray-200 focus:ring-green-500"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="age">나이</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="age" className="text-gray-700 font-medium">나이</Label>
                     <Input
                       id="age"
                       type="number"
                       value={formData.age}
                       onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                       placeholder="25"
-                      className="mt-1"
+                      className="h-12 border-gray-200"
                     />
                   </div>
-
-                  <div>
-                    <Label htmlFor="gender">성별</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender" className="text-gray-700 font-medium">성별</Label>
                     <select
                       id="gender"
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
-                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                      className="w-full h-12 px-3 border border-gray-200 rounded-md focus:ring-2 focus:ring-green-500 text-sm"
                     >
                       <option value="male">남성</option>
                       <option value="female">여성</option>
@@ -176,173 +198,195 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
                   </div>
                 </div>
 
-                <Button
-                  onClick={() => setStep(2)}
-                  disabled={!formData.name || !formData.age}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  다음 <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="height" className="text-gray-700 font-medium">키 (cm)</Label>
+                    <Input
+                      id="height"
+                      type="number"
+                      value={formData.height}
+                      onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                      placeholder="175"
+                      className="h-12 border-gray-200"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="weight" className="text-gray-700 font-medium">체중 (kg)</Label>
+                    <Input
+                      id="weight"
+                      type="number"
+                      value={formData.weight}
+                      onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                      placeholder="70"
+                      className="h-12 border-gray-200"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Step 2: Meal Times */}
           {step === 2 && (
-            <div className="space-y-5">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Clock className="w-8 h-8 text-green-600" />
-                </div>
-                <h1 className="text-xl font-bold text-gray-900 mb-1">식사 시간</h1>
-                <p className="text-sm text-gray-600">평소 식사 시간을 알려주세요</p>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-bold text-gray-900">식사 시간 설정</h1>
+                <p className="text-sm text-gray-500">정해진 시간에 맞춰 알림을 보내드릴게요 (필수)</p>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="breakfast">아침 식사 시간</Label>
-                  <Input
-                    id="breakfast"
-                    type="time"
-                    value={formData.breakfastTime}
-                    onChange={(e) => setFormData({ ...formData, breakfastTime: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="lunch">점심 식사 시간</Label>
-                  <Input
-                    id="lunch"
-                    type="time"
-                    value={formData.lunchTime}
-                    onChange={(e) => setFormData({ ...formData, lunchTime: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dinner">저녁 식사 시간</Label>
-                  <Input
-                    id="dinner"
-                    type="time"
-                    value={formData.dinnerTime}
-                    onChange={(e) => setFormData({ ...formData, dinnerTime: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => setStep(1)}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    이전
-                  </Button>
-                  <Button
-                    onClick={() => setStep(3)}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                  >
-                    다음 <ArrowRight className="ml-2 w-4 h-4" />
-                  </Button>
-                </div>
+              <div className="space-y-5">
+                {[
+                  { label: '아침 식사', id: 'breakfastTime', icon: '🌅' },
+                  { label: '점심 식사', id: 'lunchTime', icon: '☀️' },
+                  { label: '저녁 식사', id: 'dinnerTime', icon: '🌙' },
+                ].map((meal) => (
+                  <div key={meal.id} className="p-4 bg-gray-50 rounded-xl flex items-center gap-4">
+                    <span className="text-2xl">{meal.icon}</span>
+                    <div className="flex-1">
+                      <Label htmlFor={meal.id} className="text-sm font-semibold text-gray-700">{meal.label}</Label>
+                      <Input
+                        id={meal.id}
+                        type="time"
+                        value={(formData as any)[meal.id]}
+                        onChange={(e) => setFormData({ ...formData, [meal.id]: e.target.value })}
+                        className="border-none bg-transparent h-8 p-0 font-bold text-lg focus-visible:ring-0"
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Step 3: Food Preferences */}
           {step === 3 && (
-            <div className="space-y-5">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Utensils className="w-8 h-8 text-green-600" />
-                </div>
-                <h1 className="text-xl font-bold text-gray-900 mb-1">음식 취향</h1>
-                <p className="text-sm text-gray-600">좋아하는 음식을 모두 선택해주세요</p>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-bold text-gray-900">식사 취향 및 제한</h1>
+                <p className="text-sm text-gray-500">좋아하는 음식과 피하고 싶은 음식을 알려주세요 (선택)</p>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm">선호하는 음식 카테고리 (복수 선택)</Label>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <Label className="text-gray-900 font-bold">선호하는 음식 (복수 선택)</Label>
+                  <div className="grid grid-cols-3 gap-2">
                     {foodCategories.map((category) => (
                       <button
                         key={category.id}
                         onClick={() => toggleCategory(category.id)}
-                        className={`p-2.5 rounded-lg border-2 transition-all ${
-                          formData.preferredCategories.includes(category.id)
-                            ? 'border-green-600 bg-green-50'
-                            : 'border-gray-200 hover:border-green-300'
-                        }`}
+                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${formData.preferredCategories.includes(category.id)
+                          ? 'border-green-600 bg-green-50 shadow-sm'
+                          : 'border-gray-100 hover:border-green-200 bg-white'
+                          }`}
                       >
-                        <div className="text-xl mb-0.5">{category.emoji}</div>
-                        <div className="text-[10px] font-medium text-gray-900">{category.label}</div>
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    선택한 카테고리: {formData.preferredCategories.length}개
-                  </p>
-                </div>
-
-                <div>
-                  <Label className="text-sm">식습관 목표</Label>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {[
-                      { value: 'lose', label: '다이어트', emoji: '🥗' },
-                      { value: 'balanced', label: '균형잡힌', emoji: '⚖️' },
-                      { value: 'gain', label: '영양보충', emoji: '💪' },
-                    ].map((goal) => (
-                      <button
-                        key={goal.value}
-                        onClick={() => setFormData({ ...formData, healthGoal: goal.value as any })}
-                        className={`p-3 rounded-lg border-2 transition-all ${
-                          formData.healthGoal === goal.value
-                            ? 'border-green-600 bg-green-50'
-                            : 'border-gray-200 hover:border-green-300'
-                        }`}
-                      >
-                        <div className="text-xl mb-1">{goal.emoji}</div>
-                        <div className="text-[10px] font-medium">{goal.label}</div>
+                        <span className="text-xl">{category.emoji}</span>
+                        <span className="text-[11px] font-bold text-gray-700">{category.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <h3 className="text-sm font-medium text-green-900 mb-1">준비 완료!</h3>
-                  <p className="text-xs text-green-700">
-                    {formData.name}님의 취향에 맞는 맛집을 추천해드릴게요 🎉
-                  </p>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => setStep(2)}
-                    variant="outline"
-                    className="w-full"
-                    disabled={isSubmitting}
-                  >
-                    이전
-                  </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting || formData.preferredCategories.length === 0}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                  >
-                    {isSubmitting ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="animate-spin w-4 h-4" />
-                        저장 중...
-                      </span>
-                    ) : (
-                      '시작하기 🎉'
-                    )}
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="disliked" className="text-gray-900 font-bold">기피하거나 못 먹는 음식</Label>
+                  <Input
+                    id="disliked"
+                    value={formData.dislikedFoods}
+                    onChange={(e) => setFormData({ ...formData, dislikedFoods: e.target.value })}
+                    placeholder="예: 오이, 가지, 견과류 (쉼표로 구분)"
+                    className="h-12 border-gray-200"
+                  />
+                  <p className="text-xs text-gray-400">추천 알고리즘에서 최대한 제외해 드릴게요.</p>
                 </div>
               </div>
             </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-bold text-gray-900">목표 및 활동량</h1>
+                <p className="text-sm text-gray-500">목표 달성을 위한 칼로리를 계산해 드려요 (선택)</p>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <Label className="text-gray-900 font-bold">나의 목표</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'lose', label: '체중 감량', emoji: '🥗' },
+                      { value: 'balanced', label: '건강 유지', emoji: '⚖️' },
+                      { value: 'gain', label: '근육 성장', emoji: '💪' },
+                    ].map((g) => (
+                      <button
+                        key={g.value}
+                        onClick={() => setFormData({ ...formData, healthGoal: g.value as any })}
+                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${formData.healthGoal === g.value
+                          ? 'border-green-600 bg-green-50 shadow-sm'
+                          : 'border-gray-100 hover:border-green-200 bg-white'
+                          }`}
+                      >
+                        <span className="text-xl">{g.emoji}</span>
+                        <span className="text-[11px] font-bold text-gray-700">{g.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-gray-900 font-bold">활동 수준</Label>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'sedentary', label: '비활동적', desc: '주로 앉아서 생활함' },
+                      { value: 'moderate', label: '적당함', desc: '일주일에 1-3회 운동' },
+                      { value: 'active', label: '활기참', desc: '일주일에 4-5회 격렬한 운동' },
+                    ].map((level) => (
+                      <button
+                        key={level.value}
+                        onClick={() => setFormData({ ...formData, activityLevel: level.value as any })}
+                        className={`w-full p-3 rounded-xl border-2 text-left transition-all ${formData.activityLevel === level.value
+                          ? 'border-green-600 bg-green-50'
+                          : 'border-gray-100 bg-white'
+                          }`}
+                      >
+                        <p className="font-bold text-sm text-gray-900">{level.label}</p>
+                        <p className="text-xs text-gray-500">{level.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Buttons (Fixed at Bottom) */}
+      <div className="bg-white px-6 py-6 border-t border-gray-100 flex-none bg-white/80 backdrop-blur-md">
+        <div className="max-w-md mx-auto flex gap-3">
+          {step > 1 && (
+            <Button
+              onClick={() => setStep(step - 1)}
+              variant="outline"
+              className="flex-1 h-12 border-gray-200 text-gray-600 font-bold"
+              disabled={isSubmitting}
+            >
+              이전
+            </Button>
+          )}
+          {step < totalSteps ? (
+            <Button
+              onClick={() => setStep(step + 1)}
+              disabled={step === 1 && (!formData.name || !formData.age || !formData.height || !formData.weight)}
+              className="flex-[2] h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-lg shadow-green-100"
+            >
+              다음 단계로
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="flex-[2] h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-lg shadow-green-100"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin" /> : '프로필 완성하기 🎉'}
+            </Button>
           )}
         </div>
       </div>

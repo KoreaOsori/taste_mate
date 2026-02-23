@@ -19,10 +19,10 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
     age: userProfile.age.toString(),
     height: userProfile.height.toString(),
     weight: userProfile.weight.toString(),
-    targetWeight: userProfile.targetWeight.toString(),
-    breakfastTime: userProfile.breakfastTime,
-    lunchTime: userProfile.lunchTime,
-    dinnerTime: userProfile.dinnerTime,
+    target_weight: userProfile.target_weight.toString(),
+    breakfast_time: userProfile.breakfast_time,
+    lunch_time: userProfile.lunch_time,
+    dinner_time: userProfile.dinner_time,
   });
 
   const handleSave = async () => {
@@ -32,18 +32,18 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
       age: parseInt(formData.age),
       height: parseInt(formData.height),
       weight: parseInt(formData.weight),
-      targetWeight: parseInt(formData.targetWeight),
-      breakfastTime: formData.breakfastTime,
-      lunchTime: formData.lunchTime,
-      dinnerTime: formData.dinnerTime,
+      target_weight: parseInt(formData.target_weight),
+      breakfast_time: formData.breakfast_time,
+      lunch_time: formData.lunch_time,
+      dinner_time: formData.dinner_time,
     };
 
     try {
       const { url, key, isConfigured } = getSupabaseConfig();
-      
+
       if (isConfigured) {
         const response = await fetch(
-          `${url}/functions/v1/make-server-4e0538b1/profile/${userProfile.userId}`,
+          `${url}/functions/v1/make-server-4e0538b1/profile/${userProfile.user_id}`,
           {
             method: 'PUT',
             headers: {
@@ -58,7 +58,7 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
           console.warn('Failed to update profile on backend');
         }
       }
-      
+
       // Update local state regardless
       setUserProfile(updatedProfile);
       setShowEditModal(false);
@@ -83,7 +83,7 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
       <div className="bg-gradient-to-br from-green-600 to-green-700 text-white px-6 pt-4 pb-8">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold">프로필</h1>
-          <button 
+          <button
             onClick={() => setShowEditModal(true)}
             className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
           >
@@ -130,8 +130,8 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
                 <p className="text-sm font-medium text-green-700">{bmiCategory}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-600">목표 칼로리</p>
-                <p className="text-sm font-bold text-green-700">{userProfile.targetCalories} kcal</p>
+                <p className="text-xs text-gray-600">목표 칼러리</p>
+                <p className="text-sm font-bold text-green-700">{userProfile.target_calories} kcal</p>
               </div>
             </div>
           </div>
@@ -145,7 +145,7 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
           <div className="p-3.5 flex items-center justify-between border-b border-gray-100">
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-900">목표 체중</p>
-              <p className="text-xs text-gray-600 mt-0.5">{userProfile.targetWeight}kg</p>
+              <p className="text-xs text-gray-600 mt-0.5">{userProfile.target_weight}kg</p>
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
           </div>
@@ -153,10 +153,10 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-900">활동 수준</p>
               <p className="text-xs text-gray-600 mt-0.5">
-                {userProfile.activityLevel === 'sedentary' ? '거의 운동 안함' :
-                 userProfile.activityLevel === 'light' ? '가벼운 운동' :
-                 userProfile.activityLevel === 'moderate' ? '중간 운동' :
-                 userProfile.activityLevel === 'active' ? '적극적 운동' : '매우 적극적'}
+                {userProfile.activity_level === 'sedentary' ? '거의 운동 안함' :
+                  userProfile.activity_level === 'light' ? '가벼운 운동' :
+                    userProfile.activity_level === 'moderate' ? '중간 운동' :
+                      userProfile.activity_level === 'active' ? '적극적 운동' : '매우 적극적'}
               </p>
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -165,7 +165,7 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900">식사 시간</p>
               <p className="text-xs text-gray-600 mt-0.5 truncate">
-                아침 {userProfile.breakfastTime} · 점심 {userProfile.lunchTime} · 저녁 {userProfile.dinnerTime}
+                아침 {userProfile.breakfast_time} · 점심 {userProfile.lunch_time} · 저녁 {userProfile.dinner_time}
               </p>
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
@@ -297,8 +297,8 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
                   <Input
                     id="edit-target"
                     type="number"
-                    value={formData.targetWeight}
-                    onChange={(e) => setFormData({ ...formData, targetWeight: e.target.value })}
+                    value={formData.target_weight}
+                    onChange={(e) => setFormData({ ...formData, target_weight: e.target.value })}
                     className="mt-1"
                   />
                 </div>
@@ -311,24 +311,24 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
                     <p className="text-xs text-gray-600 mb-1">아침</p>
                     <Input
                       type="time"
-                      value={formData.breakfastTime}
-                      onChange={(e) => setFormData({ ...formData, breakfastTime: e.target.value })}
+                      value={formData.breakfast_time}
+                      onChange={(e) => setFormData({ ...formData, breakfast_time: e.target.value })}
                     />
                   </div>
                   <div>
                     <p className="text-xs text-gray-600 mb-1">점심</p>
                     <Input
                       type="time"
-                      value={formData.lunchTime}
-                      onChange={(e) => setFormData({ ...formData, lunchTime: e.target.value })}
+                      value={formData.lunch_time}
+                      onChange={(e) => setFormData({ ...formData, lunch_time: e.target.value })}
                     />
                   </div>
                   <div>
                     <p className="text-xs text-gray-600 mb-1">저녁</p>
                     <Input
                       type="time"
-                      value={formData.dinnerTime}
-                      onChange={(e) => setFormData({ ...formData, dinnerTime: e.target.value })}
+                      value={formData.dinner_time}
+                      onChange={(e) => setFormData({ ...formData, dinner_time: e.target.value })}
                     />
                   </div>
                 </div>

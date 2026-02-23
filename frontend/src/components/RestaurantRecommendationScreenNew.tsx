@@ -216,7 +216,7 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
 
     try {
       const data = await recommendService.getRecommendations(
-        userProfile.userId,
+        userProfile.user_id,
         userLocationData?.lat,
         userLocationData?.lng
       );

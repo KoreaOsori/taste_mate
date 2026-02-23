@@ -18,7 +18,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
 
   useEffect(() => {
     const hour = new Date().getHours();
-    
+
     if (hour < 10) {
       setGreeting('좋은 아침이에요');
       setMealTime('아침');
@@ -72,7 +72,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
   const targetFat = userProfile.goal === 'lose' ? 50 : userProfile.goal === 'gain' ? 70 : 60;
 
   // Calculate percentages
-  const caloriePercentage = Math.min((todayCalories / userProfile.targetCalories) * 100, 100);
+  const caloriePercentage = Math.min((todayCalories / userProfile.target_calories) * 100, 100);
   const proteinPercentage = Math.min((todayProtein / targetProtein) * 100, 100);
   const carbsPercentage = Math.min((todayCarbs / targetCarbs) * 100, 100);
   const fatPercentage = Math.min((todayFat / targetFat) * 100, 100);
@@ -90,7 +90,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
 
   // Character evolution based on cuisine preference
   const getCharacterByCuisine = (cuisine: string) => {
-    switch(cuisine) {
+    switch (cuisine) {
       case 'korean':
         return { emoji: '🍚', type: '한식 마스터', icon: '🥢' };
       case 'japanese':
@@ -240,8 +240,8 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
   const balanceScore = getBalanceScore();
 
   const currentTip = healthTips[currentTipIndex];
-  const currentCommunityItem = currentCommunityIndex < communityItems.length 
-    ? communityItems[currentCommunityIndex] 
+  const currentCommunityItem = currentCommunityIndex < communityItems.length
+    ? communityItems[currentCommunityIndex]
     : null;
 
   return (
@@ -263,7 +263,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
       <div className="px-6 py-2">
         <div className="relative h-40 overflow-hidden">
           {currentCommunityItem ? (
-            <div 
+            <div
               className="bg-white rounded-3xl shadow-xl p-8 border-3 border-gray-200 transition-all duration-500"
               key={currentCommunityIndex}
               onTouchStart={handleCommunityTouchStart}
@@ -274,11 +274,10 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
                 <div className="text-5xl">{currentCommunityItem.icon}</div>
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
-                    <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${
-                      currentCommunityItem.type === 'community' 
-                        ? 'bg-red-100 text-red-600' 
-                        : 'bg-purple-100 text-purple-600'
-                    }`}>
+                    <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${currentCommunityItem.type === 'community'
+                      ? 'bg-red-100 text-red-600'
+                      : 'bg-purple-100 text-purple-600'
+                      }`}>
                       {currentCommunityItem.badge}
                     </span>
                     {currentCommunityItem.type === 'community' && (
@@ -313,17 +312,16 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
             </button>
           )}
         </div>
-        
+
         {/* Pagination Dots */}
         <div className="flex items-center justify-center gap-2 mt-4">
           {[...communityItems, null].map((_, index) => (
             <div
               key={index}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                index === currentCommunityIndex 
-                  ? 'w-8 bg-green-500' 
-                  : 'w-2 bg-gray-300'
-              }`}
+              className={`h-2 rounded-full transition-all duration-300 ${index === currentCommunityIndex
+                ? 'w-8 bg-green-500'
+                : 'w-2 bg-gray-300'
+                }`}
             />
           ))}
         </div>
@@ -364,7 +362,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
             </div>
             <div className="flex items-baseline gap-2 mb-3">
               <span className="text-4xl font-bold text-gray-900">{todayCalories}</span>
-              <span className="text-base font-medium text-gray-600">/ {userProfile.targetCalories}</span>
+              <span className="text-base font-medium text-gray-600">/ {userProfile.target_calories}</span>
             </div>
             <div className="bg-orange-200 rounded-full h-3 overflow-hidden">
               <div
@@ -438,16 +436,15 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
             {healthTips.map((_, index) => (
               <div
                 key={index}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  index === currentTipIndex 
-                    ? 'w-8 bg-green-500' 
-                    : 'w-2 bg-gray-300'
-                }`}
+                className={`h-2 rounded-full transition-all duration-300 ${index === currentTipIndex
+                  ? 'w-8 bg-green-500'
+                  : 'w-2 bg-gray-300'
+                  }`}
               />
             ))}
           </div>
         </div>
-        
+
         <div className={`bg-gradient-to-br ${currentTip.color} rounded-3xl p-10 text-white shadow-xl transition-all duration-500`}>
           <div className="flex items-start gap-5">
             <div className="w-20 h-20 bg-white/30 rounded-3xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm text-5xl">

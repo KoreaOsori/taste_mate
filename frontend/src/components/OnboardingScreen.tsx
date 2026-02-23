@@ -20,39 +20,40 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
     gender: 'male' as 'male' | 'female' | 'other',
     height: '',
     weight: '',
-    targetWeight: '',
-    goal: 'lose' as 'lose' | 'maintain' | 'gain',
-    activityLevel: 'moderate' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active',
-    breakfastTime: '08:00',
-    lunchTime: '12:00',
-    dinnerTime: '18:00',
+    target_weight: '',
+    goal: 'balanced' as 'lose' | 'balanced' | 'gain',
+    activity_level: 'moderate' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active',
+    breakfast_time: '08:00',
+    lunch_time: '12:00',
+    dinner_time: '18:00',
   });
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
     const targetCalories = calculateTargetCalories();
-    
+
     const profile: UserProfile = {
-      userId: crypto.randomUUID(),
+      user_id: crypto.randomUUID(),
       name: formData.name,
       age: parseInt(formData.age),
       gender: formData.gender,
       height: parseInt(formData.height),
       weight: parseInt(formData.weight),
-      targetWeight: parseInt(formData.targetWeight),
-      targetCalories,
-      currentCalories: 0,
-      breakfastTime: formData.breakfastTime,
-      lunchTime: formData.lunchTime,
-      dinnerTime: formData.dinnerTime,
-      activityLevel: formData.activityLevel,
+      target_weight: parseInt(formData.target_weight),
+      target_calories: targetCalories,
+      current_calories: 0,
+      breakfast_time: formData.breakfast_time,
+      lunch_time: formData.lunch_time,
+      dinner_time: formData.dinner_time,
+      activity_level: formData.activity_level,
       goal: formData.goal,
+      preferred_categories: [], // 필수 필드 추가
     };
 
     try {
       // Check if Supabase is configured
       const { url, key, isConfigured } = getSupabaseConfig();
-      
+
       if (isConfigured) {
         // Try to save to backend, but don't block if it fails
         const response = await fetch(
@@ -87,7 +88,7 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
     const weight = parseInt(formData.weight);
     const height = parseInt(formData.height);
     const age = parseInt(formData.age);
-    
+
     // Harris-Benedict Equation
     let bmr = 0;
     if (formData.gender === 'male') {
@@ -104,7 +105,7 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
       'very-active': 1.9,
     };
 
-    let tdee = bmr * activityMultipliers[formData.activityLevel];
+    let tdee = bmr * activityMultipliers[formData.activity_level];
 
     if (formData.goal === 'lose') {
       tdee -= 500;
@@ -125,7 +126,7 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
             <span className="text-sm text-green-600 font-medium">{Math.round((step / 3) * 100)}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
+            <div
               className="bg-green-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${(step / 3) * 100}%` }}
             ></div>
@@ -233,12 +234,12 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="targetWeight">목표 체중 (kg)</Label>
+                <Label htmlFor="target_weight">목표 체중 (kg)</Label> {/* Changed htmlFor to target_weight */}
                 <Input
-                  id="targetWeight"
+                  id="target_weight" // Changed id to target_weight
                   type="number"
-                  value={formData.targetWeight}
-                  onChange={(e) => setFormData({ ...formData, targetWeight: e.target.value })}
+                  value={formData.target_weight}
+                  onChange={(e) => setFormData({ ...formData, target_weight: e.target.value })}
                   placeholder="65"
                   className="mt-1"
                 />
@@ -255,11 +256,10 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
                     <button
                       key={goal.value}
                       onClick={() => setFormData({ ...formData, goal: goal.value as any })}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        formData.goal === goal.value
-                          ? 'border-green-600 bg-green-50'
-                          : 'border-gray-200 hover:border-green-300'
-                      }`}
+                      className={`p-4 rounded-lg border-2 transition-all ${formData.goal === goal.value
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-200 hover:border-green-300'
+                        }`}
                     >
                       <div className="text-2xl mb-1">{goal.emoji}</div>
                       <div className="text-xs font-medium">{goal.label}</div>
@@ -269,10 +269,9 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
               </div>
 
               <div>
-                <Label>활동 수준</Label>
                 <select
-                  value={formData.activityLevel}
-                  onChange={(e) => setFormData({ ...formData, activityLevel: e.target.value as any })}
+                  value={formData.activity_level}
+                  onChange={(e) => setFormData({ ...formData, activity_level: e.target.value as any })}
                   className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="sedentary">거의 운동 안함</option>
@@ -293,7 +292,7 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
                 </Button>
                 <Button
                   onClick={() => setStep(3)}
-                  disabled={!formData.targetWeight}
+                  disabled={!formData.target_weight}
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
                   다음 <ArrowRight className="ml-2 w-4 h-4" />
@@ -316,36 +315,36 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="breakfast">아침 식사 시간</Label>
+                <Label htmlFor="breakfast_time">아침 식사 시간</Label> {/* Changed htmlFor to breakfast_time */}
                 <Input
-                  id="breakfast"
+                  id="breakfast_time" // Changed id to breakfast_time
                   type="time"
-                  value={formData.breakfastTime}
-                  onChange={(e) => setFormData({ ...formData, breakfastTime: e.target.value })}
+                  value={formData.breakfast_time} // Changed from formData.breakfastTime to formData.breakfast_time
+                  onChange={(e) => setFormData({ ...formData, breakfast_time: e.target.value })} // Changed breakfastTime to breakfast_time
                   className="mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">30분 전에 알림을 보내드려요</p>
               </div>
 
               <div>
-                <Label htmlFor="lunch">점심 식사 시간</Label>
+                <Label htmlFor="lunch_time">점심 식사 시간</Label> {/* Changed htmlFor to lunch_time */}
                 <Input
-                  id="lunch"
+                  id="lunch_time" // Changed id to lunch_time
                   type="time"
-                  value={formData.lunchTime}
-                  onChange={(e) => setFormData({ ...formData, lunchTime: e.target.value })}
+                  value={formData.lunch_time} // Changed from formData.lunchTime to formData.lunch_time
+                  onChange={(e) => setFormData({ ...formData, lunch_time: e.target.value })} // Changed lunchTime to lunch_time
                   className="mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">30분 전에 알림을 보내드려요</p>
               </div>
 
               <div>
-                <Label htmlFor="dinner">저녁 식사 시간</Label>
+                <Label htmlFor="dinner_time">저녁 식사 시간</Label> {/* Changed htmlFor to dinner_time */}
                 <Input
-                  id="dinner"
+                  id="dinner_time" // Changed id to dinner_time
                   type="time"
-                  value={formData.dinnerTime}
-                  onChange={(e) => setFormData({ ...formData, dinnerTime: e.target.value })}
+                  value={formData.dinner_time} // Changed from formData.dinnerTime to formData.dinner_time
+                  onChange={(e) => setFormData({ ...formData, dinner_time: e.target.value })} // Changed dinnerTime to dinner_time
                   className="mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">30분 전에 알림을 보내드려요</p>

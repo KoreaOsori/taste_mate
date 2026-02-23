@@ -14,25 +14,28 @@ import { RestaurantRecommendationScreenNew } from './components/RestaurantRecomm
 import { FoodFarmScreen } from './components/FoodFarmScreen';
 import { Home, Calendar, Users, PlusCircle, Utensils, User } from 'lucide-react';
 import { getSupabaseConfig } from './utils/supabase-config';
+import { profileService } from './api/apiClient';
 
 export type Screen = 'login' | 'signup' | 'location' | 'onboarding' | 'home' | 'chat' | 'community' | 'meal-log' | 'calendar' | 'health-report' | 'profile' | 'restaurant' | 'foodfarm';
 
 export interface UserProfile {
-  userId: string;
+  user_id: string;
   name: string;
   age: number;
   gender: 'male' | 'female' | 'other';
   height: number;
   weight: number;
-  targetWeight: number;
-  targetCalories: number;
-  currentCalories: number;
-  breakfastTime: string;
-  lunchTime: string;
-  dinnerTime: string;
-  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
+  target_weight: number;
+  target_calories: number;
+  current_calories: number;
+  breakfast_time: string;
+  lunch_time: string;
+  dinner_time: string;
+  activity_level: 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
   goal: 'lose' | 'balanced' | 'gain';
-  preferredCategories: string[];
+  preferred_categories: string[];
+  disliked_foods?: string[];
+  restricted_foods?: string[];
   location?: string;
 }
 
@@ -78,41 +81,33 @@ export default function App() {
   const [todaysMeals, setTodaysMeals] = useState<Meal[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [signupData, setSignupData] = useState<{ userId: string; email: string; name: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Check if user has profile
     const savedUserId = localStorage.getItem('tastemate_userId');
     if (savedUserId) {
-      fetchUserProfile(savedUserId);
-      setCurrentScreen('home');
+      fetchUserProfile(savedUserId).finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
     }
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      // Check if Supabase is configured
-      const { url, key, isConfigured } = getSupabaseConfig();
-
-      if (!isConfigured) {
-        console.log('Supabase not configured, using local data only');
-        return;
-      }
-
-      const response = await fetch(
-        `${url}/functions/v1/make-server-4e0538b1/profile/${userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${key}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const profile = await response.json();
-        setUserProfile(profile);
+      const profile = await profileService.getProfile(userId);
+      if (profile) {
+        // Handle field name consistency (backend returns snake_case now)
+        setUserProfile(profile as unknown as UserProfile);
+        setCurrentScreen('home');
+      } else {
+        console.warn('Profile not found for userId:', userId);
+        setCurrentScreen('login');
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+      // fallback to login on error
+      setCurrentScreen('login');
     }
   };
 
@@ -129,21 +124,21 @@ export default function App() {
   const handleGuestLogin = () => {
     // Create a guest profile
     const guestProfile: UserProfile = {
-      userId: 'guest',
+      user_id: 'guest',
       name: '게스트',
       age: 30,
       gender: 'male',
       height: 170,
       weight: 70,
-      targetWeight: 65,
-      targetCalories: 2000,
-      currentCalories: 0,
-      breakfastTime: '08:00',
-      lunchTime: '12:00',
-      dinnerTime: '18:00',
-      activityLevel: 'moderate',
+      target_weight: 65,
+      target_calories: 2000,
+      current_calories: 0,
+      breakfast_time: '08:00',
+      lunch_time: '12:00',
+      dinner_time: '18:00',
+      activity_level: 'moderate',
       goal: 'balanced',
-      preferredCategories: ['한식', '일식', '중식', '양식'],
+      preferred_categories: ['한식', '일식', '중식', '양식'],
       location: '서울시 강남구',
     };
     setUserProfile(guestProfile);
@@ -157,7 +152,7 @@ export default function App() {
 
   const handleOnboardingComplete = (profile: UserProfile) => {
     setUserProfile(profile);
-    localStorage.setItem('tastemate_userId', profile.userId);
+    localStorage.setItem('tastemate_userId', profile.user_id);
     setCurrentScreen('home');
   };
 
@@ -165,10 +160,18 @@ export default function App() {
     if (userProfile) {
       setUserProfile({
         ...userProfile,
-        currentCalories: userProfile.currentCalories + calories,
+        current_calories: userProfile.current_calories + calories,
       });
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

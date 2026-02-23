@@ -43,7 +43,7 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
     try {
       // Send to FastAPI backend
       const saved = await mealService.createMeal({
-        user_id: userProfile.userId,
+        user_id: userProfile.user_id,
         meal_type: formData.mealType,
         food_name: formData.foodName,
         calories: parseInt(formData.calories),
@@ -82,7 +82,7 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
       if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
         const today = new Date().toISOString().split('T')[0];
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/make-server-4e0538b1/meals/${userProfile.userId}/${today}/${meal.id}`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/make-server-4e0538b1/meals/${userProfile.user_id}/${today}/${meal.id}`,
           {
             method: 'DELETE',
             headers: {
@@ -125,7 +125,7 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
       <div className="bg-white px-6 py-4 border-b border-gray-200">
         <h1 className="text-xl font-bold text-gray-900">식사 기록</h1>
         <p className="text-sm text-gray-600 mt-1">
-          오늘 {totalCalories}kcal / {userProfile.targetCalories}kcal
+          오늘 {totalCalories}kcal / {userProfile.target_calories}kcal
         </p>
       </div>
 
@@ -252,8 +252,8 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
                       key={type.value}
                       onClick={() => setFormData({ ...formData, mealType: type.value as any })}
                       className={`p-3 rounded-lg border-2 transition-all ${formData.mealType === type.value
-                          ? 'border-green-600 bg-green-50'
-                          : 'border-gray-200'
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-200'
                         }`}
                     >
                       <div className="text-xl mb-1">{type.emoji}</div>
