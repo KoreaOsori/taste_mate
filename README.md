@@ -1,91 +1,80 @@
-# 🍚 밥친구 (Ricefreind)
-> **개인 맞춤형 식단 추천 서비스 (Swipe UX)**
+# 🍱 TasteMate (밥친구)
+> **AI 기반 맞춤형 식단 관리 및 맛집 추천 서비스**
 
-![Project Banner](https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1200&auto=format&fit=crop)
-
-밥친구는 사용자의 현재 감정, 상황, 영양 상태를 분석하여 최적의 식단을 추천해주는 AI 기반 서비스입니다. 직관적인 스와이프 인터페이스를 통해 즐겁게 메뉴를 선택하고 건강한 식습관을 관리할 수 있습니다.
+TasteMate는 사용자의 신체 정보, 식습관, 현재 위치를 결합하여 최적의 영양 분석과 맛집 추천을 제공하는 스마트 식단 가이드 애플리케이션입니다.
 
 ---
 
-## ✨ 주요 기능 (Key Features)
+## 🚀 주요 기능 (Core Features)
 
-### 1. 틴더 스타일 스와이프 추천
-- **몰입형 UI**: 이미지가 화면의 70%를 차지하는 시각 중심의 카드 인터페이스.
-- **직관적 제스처**: 좌(거절) / 우(선택) 스와이프로 간편한 메뉴 탐색.
-- **점진적 정보 노출**: 카드 클릭 시 칼로리, 탄/단/지 영양 성분, 추천 사유 상세 확인 가능.
+### 1. 지능형 온보딩 (Smart Onboarding)
+*   사용자의 나이, 성별, 키, 체중, 활동량, 건강 목표 수집.
+*   Harris-Benedict 공식을 활용한 기초대사량(BMR) 및 일일 권장 칼로리(TDEE) 자동 계산.
+*   식사 취향(기호품/기피 음식) 및 식사 시간 설정.
 
-### 2. AI 개인화 엔진 (RAG + ML)
-- **상황 기반 추천**: 오늘의 날씨, 기분, 동행인, 예산을 고려한 지능형 필터링.
-- **GPT-4o 연동**: OpenAI의 RAG(Retrieval-Augmented Generation) 모델을 활용한 정교한 추천 사유 생성.
+### 2. AI 영양 분석 및 대시보드
+*   일일 목표 칼로리 대비 실시간 섭취량 시각화.
+*   식사 기록(아침, 점심, 저녁, 간식)별 상세 영양소 추적.
+*   사용자 데이터 기반 맞춤형 건강 인사이트 제공.
 
-### 3. 식단 관리 및 커뮤니티
-- **영양 기록**: 일일 칼로리 섭취량 및 목표 체중 관리.
-- **실시간 소통**: 커뮤니티 포스팅을 통한 사용자 간 식단 공유.
-
----
-
-## 🛠️ 기술 스택 (Tech Stack)
-
-### Frontend
-- **Core**: React 18.3, TypeScript
-- **Styling**: Tailwind CSS
-- **Animation**: Framer Motion (Swipe UX 핵심)
-- **Icons/UI**: Lucide React, Radix UI
-
-### Backend
-- **Framework**: FastAPI (Python 3.10+)
-- **Database**: Supabase (PostgreSQL)
-- **AI/LLM**: OpenAI GPT-4o (RAG Logic)
-- **Auth**: Supabase Auth + Kakao Login
+### 3. 맞춤형 맛집 추천
+*   사용자의 선호 카테고리 및 위치 기반 실시간 식당 추천.
+*   AI 챗봇을 통한 메뉴 결정 및 식단 고민 상담.
 
 ---
 
-## 📂 프로젝트 구조 (Structure)
+## 🛠 기술 스택 (Tech Stack)
+
+### **Frontend**
+*   **Framework**: React 18 (Vite)
+*   **UI/UX**: Tailwind CSS, Lucide Icons, Shadcn UI
+*   **State/API**: Axios, React Hooks
+
+### **Backend**
+*   **Framework**: FastAPI (Python 3.11)
+*   **Database/Auth**: Supabase (PostgreSQL)
+*   **AI Engine**: OpenAI GPT-4o / Google Gemini
+*   **Data Analysis**: Pandas, Scikit-learn (추천 엔진 로직)
+
+---
+
+## 🐳 개발 환경 및 실행 방법 (Docker)
+
+본 프로젝트는 서비스 간의 의존성 해결과 일관된 실행 환경을 위해 Docker를 사용합니다.
+
+### 1. 사전 준비 (Pre-requisites)
+*   Docker 및 Docker Desktop 설치
+*   `backend/.env` 및 `frontend/.env` 파일 설정 완료
+
+### 2. 가동 방법
+터미널에서 프로젝트 루트 디렉토리로 이동한 후 아래 명령어를 입력합니다.
+```bash
+docker-compose up --build
+```
+
+### 3. 접속 정보
+*   **Frontend**: [http://localhost:3000](http://localhost:3000)
+*   **Backend API**: [http://localhost:8000](http://localhost:8000)
+*   **Backend Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+
+---
+
+## 📂 프로젝트 구조 (Architecture)
 
 ```text
 taste_mate/
-├── frontend/           # React + Vite 프론트엔드
-│   ├── src/components/ # UX 컴포넌트 (SwipeCard 등)
-│   └── src/App.tsx     # 메인 로직 및 라우팅
-├── backend/            # FastAPI 백엔드
-│   ├── api/endpoints/  # API 라우터 (meals, profile, recommend)
-│   ├── core/           # RAG 및 AI 비즈니스 로직
-│   └── db/             # Supabase 클라이언트 및 스키마
-└── docs/               # 기술 가이드 및 로드맵
+├── backend/            # FastAPI 백엔드 (API, 추천 엔진, DB 연동)
+├── frontend/           # React 프런트엔드 (Vite, UI 컴포넌트)
+├── docs/               # 상세 기술 및 요약 보고서 문서함
+│   ├── 05_Onboarding_Expansion_Report.md
+│   ├── 06_API_Integration_DB_Persistence_Report.md
+│   └── 07_Docker_Setup_Guide.md
+└── docker-compose.yml  # 하이브리드 서비스 통합 관리 설정
 ```
 
 ---
 
-## 🚀 시작하기 (Getting Started)
-
-### 1. 환경 변수 설정
-`backend/.env.example`을 참고하여 `.env` 파일을 생성하고 필요한 API 키를 입력하세요.
-- `SUPABASE_URL`, `SUPABASE_ANON_KEY`
-- `OPENAI_API_KEY`
-- `KAKAO_REST_API_KEY`
-
-### 2. 백엔드 실행
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
-
-### 3. 프론트엔드 실행
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
----
-
-## 📚 상세 문서
-더 자세한 기술 정보는 [docs/03_기술_가이드_및_환경_설명.md](docs/03_기술_가이드_및_환경_설명.md)를 참고하세요.
-
----
-
-> [!NOTE]
-> 본 프로젝트는 **Interactive Grocery Mobile App**의 진화형 버전으로, 고도의 AI 추천 알고리즘과 몰입감 있는 UX를 지향합니다.
+## 📄 라이선스 및 문서
+자세한 개발 내역은 `docs/` 폴더 내의 각 리포트를 참조하세요.
+*   [Docker 상세 가이드](docs/07_Docker_Setup_Guide.md)
+*   [API 연동 및 DB 영속화 리포트](docs/06_API_Integration_DB_Persistence_Report.md)

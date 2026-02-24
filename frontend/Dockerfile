@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 
 # Vite 개발 서버 포트 노출
-EXPOSE 5173
+EXPOSE 3000
 
 # 앱 실행
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

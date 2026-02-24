@@ -29,7 +29,7 @@ docker-compose up --build
 
 ### 단계 3: 서비스 접속 확인
 정상적으로 가동되면 아래 주소로 접속할 수 있습니다.
-*   **Frontend**: [http://localhost:5173](http://localhost:5173)
+*   **Frontend**: [http://localhost:3000](http://localhost:3000)
 *   **Backend API**: [http://localhost:8000](http://localhost:8000)
 *   **Backend Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
 
