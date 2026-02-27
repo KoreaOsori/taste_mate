@@ -44,6 +44,7 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
     dislikedFoods: '',
     healthGoal: 'balanced' as 'lose' | 'balanced' | 'gain',
     activityLevel: 'moderate' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active',
+    locationConsent: false,
   });
 
   const toggleCategory = (categoryId: string) => {
@@ -112,6 +113,7 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
       preferred_categories: formData.preferredCategories,
       disliked_foods: formData.dislikedFoods.split(',').map(s => s.trim()).filter(s => s !== ''),
       location: '',
+      location_consent: formData.locationConsent,
     };
 
     try {
@@ -222,6 +224,19 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
                       className="h-12 border-gray-200"
                     />
                   </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-green-50 rounded-xl border border-green-100 flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="locationConsent"
+                    checked={formData.locationConsent}
+                    onChange={(e) => setFormData({ ...formData, locationConsent: e.target.checked })}
+                    className="w-5 h-5 accent-green-600 rounded cursor-pointer"
+                  />
+                  <label htmlFor="locationConsent" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    실시간 위치 정보 활용에 동의합니다 (최신 추천용)
+                  </label>
                 </div>
               </div>
             </div>

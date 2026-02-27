@@ -6,6 +6,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient';
 
+import { profileService } from '../api/apiClient';
+
 interface ProfileScreenProps {
   userProfile: UserProfile;
   setUserProfile: (profile: UserProfile) => void;
@@ -24,6 +26,8 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
     lunch_time: userProfile?.lunch_time || '12:00',
     dinner_time: userProfile?.dinner_time || '18:00',
   });
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [isLocationEnabled, setIsLocationEnabled] = useState(userProfile?.location_consent || false);
 
   if (!userProfile) {
     return (
@@ -47,35 +51,42 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
     };
 
     try {
-      const url = supabaseUrl;
-      const key = supabaseAnonKey;
-
-      if (url && key) {
-        const response = await fetch(
-          `${url}/functions/v1/make-server-4e0538b1/profile/${userProfile.user_id}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-            },
-            body: JSON.stringify(updatedProfile),
-          }
-        );
-
-        if (!response.ok) {
-          console.warn('Failed to update profile on backend');
-        }
-      }
-
-      // Update local state regardless
+      await profileService.updateProfile(userProfile.user_id, updatedProfile);
       setUserProfile(updatedProfile);
       setShowEditModal(false);
     } catch (error) {
       console.error('Error updating profile:', error);
-      // Still update local state
+      // Still update local state to reflect UI changes if desired, or show alert
       setUserProfile(updatedProfile);
       setShowEditModal(false);
+    }
+  };
+
+  const handleLocationToggle = async (enabled: boolean) => {
+    setIsLocationEnabled(enabled);
+
+    const updatedProfile = {
+      ...userProfile,
+      location_consent: enabled
+    };
+
+    try {
+      await profileService.updateProfile(userProfile.user_id, updatedProfile);
+      setUserProfile(updatedProfile);
+
+      // 위치 서비스를 켰을 때 즉시 현재 위치 가져오기 시도
+      if (enabled && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            console.log('Location immediately updated from settings:', position.coords);
+          },
+          (error) => {
+            console.warn('Immediate location update failed:', error);
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error updating location consent:', error);
     }
   };
 
@@ -193,12 +204,20 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
           </button>
-          <button className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => setShowLocationModal(true)}
+            className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors"
+          >
             <div className="flex items-center gap-2.5">
               <MapPin className="w-4 h-4 text-gray-600 flex-shrink-0" />
               <span className="text-sm font-medium text-gray-900">위치 서비스</span>
             </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium ${userProfile.location_consent ? 'text-green-600' : 'text-gray-400'}`}>
+                {userProfile.location_consent ? '사용 중' : '사용 안함'}
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            </div>
           </button>
           <button className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-2.5">
@@ -356,6 +375,42 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
                   className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   저장
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Location Service Toggle Modal */}
+      {showLocationModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-6">
+          <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 mx-auto">
+                <Shield className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 text-center mb-2">위치 서비스 설정</h3>
+              <p className="text-sm text-gray-600 text-center mb-6">
+                실시간 위치 정보를 활용하여 주변의 최적화된 식당을 추천해 드립니다. 개인 정보는 안전하게 보호됩니다.
+              </p>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl mb-6">
+                <span className="font-semibold text-gray-900">실시간 위치 정보 활용</span>
+                <button
+                  onClick={() => handleLocationToggle(!isLocationEnabled)}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${isLocationEnabled ? 'bg-green-600' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isLocationEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setShowLocationModal(false)}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl h-12"
+                >
+                  확인
                 </Button>
               </div>
             </div>

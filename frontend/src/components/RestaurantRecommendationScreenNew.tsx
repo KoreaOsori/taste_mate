@@ -102,28 +102,36 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
   const [weatherData, setWeatherData] = useState<{ temp: number; condition: string } | null>(null);
   const [userLocationData, setUserLocationData] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Default coordinate (Gangnam)
+  const DEFAULT_LAT = 37.4979;
+  const DEFAULT_LNG = 127.0276;
+
   useEffect(() => {
-    // Priority: 1. Props from App.tsx, 2. Geolocation API, 3. Default (Seoul)
-    if (userLocation) {
-      const { latitude, longitude } = userLocation;
-      setUserLocationData({ lat: latitude, lng: longitude });
-      fetchWeather(latitude, longitude);
-    } else if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserLocationData({ lat: latitude, lng: longitude });
-          fetchWeather(latitude, longitude);
-        },
-        (error) => {
-          console.warn('Geolocation failed or denied:', error);
-          const defaultLoc = { lat: 37.5665, lng: 126.9780 };
-          setUserLocationData(defaultLoc);
-          fetchWeather(defaultLoc.lat, defaultLoc.lng);
-        }
-      );
+    // Strict Location Logic:
+    // 1. If location_consent is false, ALWAYS use DEFAULT (Gangnam)
+    // 2. If location_consent is true, use userLocation prop (synced from App.tsx)
+    // 3. If location_consent is true but userLocation is not yet available, we can wait or show a loading state
+
+    if (!userProfile.location_consent) {
+      console.log('Location consent is OFF, using Gangnam default');
+      const defaultLoc = { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
+      setUserLocationData(defaultLoc);
+      fetchWeather(defaultLoc.lat, defaultLoc.lng);
+    } else {
+      if (userLocation) {
+        console.log('Location consent is ON, using synchronized GPS data');
+        const { latitude, longitude } = userLocation;
+        setUserLocationData({ lat: latitude, lng: longitude });
+        fetchWeather(latitude, longitude);
+      } else {
+        console.log('Location consent is ON, waiting for GPS synchronization...');
+        // Fallback to Gangnam while waiting, but keep checking for userLocation
+        const defaultLoc = { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
+        setUserLocationData(defaultLoc);
+        fetchWeather(defaultLoc.lat, defaultLoc.lng);
+      }
     }
-  }, [userLocation]);
+  }, [userLocation, userProfile.location_consent]);
 
   const fetchWeather = async (lat: number, lng: number) => {
     try {
@@ -151,8 +159,8 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
       // Ensure we use the latest userProfile.user_id
       const data = await recommendService.getRecommendations(
         userProfile.user_id,
-        userLocationData?.lat,
-        userLocationData?.lng,
+        userLocationData?.lat || DEFAULT_LAT,
+        userLocationData?.lng || DEFAULT_LNG,
         weather,
         currentHour
       );

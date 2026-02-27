@@ -33,7 +33,7 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
 
   useEffect(() => {
     const hour = new Date().getHours();
-    
+
     // Determine greeting and meal time
     if (hour < 11) {
       setGreeting('좋은 아침이에요');
@@ -47,7 +47,7 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
     }
 
     generateRecommendations();
-  }, [userProfile.preferredCategories]);
+  }, [userProfile.preferred_categories]);
 
   const generateRecommendations = () => {
     const mockRecommendations: FoodRecommendation[] = [
@@ -110,9 +110,9 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
     ];
 
     // Filter based on user preferences if any
-    const filtered = mockRecommendations.filter(rec => 
-      userProfile.preferredCategories.length === 0 || 
-      userProfile.preferredCategories.some(cat => rec.category.includes(cat))
+    const filtered = mockRecommendations.filter(rec =>
+      userProfile.preferred_categories.length === 0 ||
+      userProfile.preferred_categories.some((cat: string) => rec.category.includes(cat))
     );
 
     setRecommendations(filtered.length > 0 ? filtered : mockRecommendations);
@@ -145,10 +145,10 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
             <h1 className="text-2xl font-bold mb-1">{greeting}, {userProfile.name}님!</h1>
             <div className="flex items-center gap-2 text-green-100 text-sm">
               <MapPin className="w-4 h-4" />
-              <span>{userProfile.location || '서울시 강남구'}</span>
+              <span>{userProfile.location || '위치 정보 확인 중...'}</span>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => onNavigate('profile')}
             className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
           >
@@ -164,7 +164,7 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
               <p className="text-2xl font-bold">{totalCalories} kcal</p>
             </div>
             <button
-              onClick={() => onNavigate('stats')}
+              onClick={() => onNavigate('health-report')}
               className="flex items-center gap-1 text-sm bg-white/20 px-3 py-2 rounded-lg hover:bg-white/30 transition-colors"
             >
               자세히
@@ -185,9 +185,9 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
               <div className="flex items-center gap-2 text-green-100 text-sm mt-1">
                 <Clock className="w-4 h-4" />
                 <span>
-                  {currentMealTime === 'breakfast' && `평소 ${userProfile.breakfastTime}에 식사하시죠?`}
-                  {currentMealTime === 'lunch' && `평소 ${userProfile.lunchTime}에 식사하시죠?`}
-                  {currentMealTime === 'dinner' && `평소 ${userProfile.dinnerTime}에 식사하시죠?`}
+                  {currentMealTime === 'breakfast' && `평소 ${userProfile.breakfast_time}에 식사하시죠?`}
+                  {currentMealTime === 'lunch' && `평소 ${userProfile.lunch_time}에 식사하시죠?`}
+                  {currentMealTime === 'dinner' && `평소 ${userProfile.dinner_time}에 식사하시죠?`}
                 </span>
               </div>
             </div>
@@ -200,7 +200,7 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
             <h3 className="text-lg font-bold text-gray-900">
               {userProfile.name}님을 위한 추천 🎯
             </h3>
-            <button 
+            <button
               onClick={() => onNavigate('restaurant')}
               className="text-sm text-green-600 font-medium flex items-center gap-1"
             >
@@ -293,7 +293,7 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
           <h3 className="text-lg font-bold text-gray-900 mb-4">바로가기</h3>
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => onNavigate('stats')}
+              onClick={() => onNavigate('calendar')}
               className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-5 text-left shadow-sm hover:shadow-md transition-shadow"
             >
               <div className="text-2xl mb-2">📊</div>
@@ -319,11 +319,11 @@ export function HomeScreenNew({ userProfile, onNavigate, todaysMeals }: HomeScre
             <div>
               <h4 className="font-bold text-gray-900 mb-1">오늘의 TIP</h4>
               <p className="text-sm text-gray-700">
-                {userProfile.goal === 'lose' 
+                {userProfile.goal === 'lose'
                   ? '다이어트 중이시군요! 저칼로리 고단백 메뉴를 추천드려요.'
                   : userProfile.goal === 'gain'
-                  ? '영양 보충이 필요하시네요! 영양가 높은 메뉴를 추천드려요.'
-                  : '균형잡힌 식단으로 건강을 유지하세요!'}
+                    ? '영양 보충이 필요하시네요! 영양가 높은 메뉴를 추천드려요.'
+                    : '균형잡힌 식단으로 건강을 유지하세요!'}
               </p>
             </div>
           </div>

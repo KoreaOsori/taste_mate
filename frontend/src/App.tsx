@@ -13,7 +13,7 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { RestaurantRecommendationScreenNew } from './components/RestaurantRecommendationScreenNew';
 import { FoodFarmScreen } from './components/FoodFarmScreen';
 import { Home, Calendar, Users, PlusCircle, Utensils, User } from 'lucide-react';
-import { profileService } from './api/apiClient';
+import { profileService, recommendService } from './api/apiClient';
 
 export type Screen = 'login' | 'signup' | 'location' | 'onboarding' | 'home' | 'chat' | 'community' | 'meal-log' | 'calendar' | 'health-report' | 'profile' | 'restaurant' | 'foodfarm';
 
@@ -36,6 +36,7 @@ export interface UserProfile {
   disliked_foods?: string[];
   restricted_foods?: string[];
   location?: string;
+  location_consent?: boolean;
 }
 
 export interface Meal {
@@ -113,6 +114,46 @@ export default function App() {
     };
   }, []);
 
+  // location_consent 상태 변화 감지 및 위치 추적 트리거
+  useEffect(() => {
+    if (userProfile?.location_consent) {
+      if ('geolocation' in navigator) {
+        console.log('Location consent active, obtaining real-time coordinates...');
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const location = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            };
+            console.log('Location synchronized:', location);
+            setUserLocation(location);
+
+            // 주소 정보(Reverse Geocoding) 가져오기
+            try {
+              const addrResponse = await recommendService.getAddress(location.latitude, location.longitude);
+              if (addrResponse && addrResponse.address) {
+                console.log('Real-time address acquired:', addrResponse.address);
+                setUserProfile(prev => prev ? { ...prev, location: addrResponse.address } : null);
+              }
+            } catch (addrError) {
+              console.warn('Failed to fetch address from coordinates:', addrError);
+            }
+          },
+          (error) => {
+            console.warn('Location tracking failed or denied:', error);
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+      }
+    } else {
+      if (userLocation) {
+        console.log('Location consent revoked, clearing location data.');
+        setUserLocation(null);
+        setUserProfile(prev => prev ? { ...prev, location: '서울시 강남구' } : null);
+      }
+    }
+  }, [userProfile?.location_consent]);
+
   const fetchUserProfile = async (userId: string) => {
     if (!userId) return;
 
@@ -123,34 +164,26 @@ export default function App() {
       const profile = await profileService.getProfile(userId);
 
       if (profile && profile.user_id) {
-        console.log('Profile found, navigating to home');
+        console.log('Profile fetched successfully:', profile);
         setUserProfile(profile as unknown as UserProfile);
         setCurrentScreen('home');
       } else {
-        console.log('Profile response empty, navigating to onboarding');
+        console.log('Profile not found (empty), starting onboarding');
         setCurrentScreen('location');
       }
     } catch (error: any) {
-      console.error('Error fetching profile:', error);
-
-      // Axios 에러 처리
-      if (error.response) {
-        if (error.response.status === 404) {
-          // 서버에 데이터가 없는 경우만 온보딩으로 이동
-          console.log('Profile not found (404), starting onboarding');
-          setCurrentScreen('location');
-        } else {
-          // 기타 서버 에러 (500 등) - 다시 로그인 시도 유도
-          alert(`서버 응답 오류 (${error.response.status}). 다시 로그인해 주세요.`);
-          handleLogout();
-        }
+      if (error.response && error.response.status === 404) {
+        console.log('New user (404 status), directing to location setup');
+        setCurrentScreen('location');
       } else if (error.request) {
         // 네트워크 에러 (CORS, 서버 다운 등)
+        console.error('Network error requesting profile:', error);
         alert('백엔드 서버(FastAPI)와 통신할 수 없습니다. \n\n1. 백엔드 서버가 port 8000에서 실행 중인지 확인해 주세요.\n2. 서버가 실행 중이라면 터미널에서 오류 메시지가 없는지 확인해 주세요.');
         handleLogout();
       } else {
-        // 기타 설정 오류
-        setCurrentScreen('login');
+        console.error('Other error fetching profile:', error);
+        alert(`프로필 조회 중 오류가 발생했습니다: ${error.message}`);
+        handleLogout();
       }
     } finally {
       setIsLoading(false);

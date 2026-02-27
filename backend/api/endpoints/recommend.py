@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 import httpx
+from datetime import datetime
 
 router = APIRouter()
 
@@ -26,6 +27,11 @@ class RestaurantRecommendation(BaseModel):
     carbs: float
     fat: float
     address: str
+
+# Default Location: Seoul, Gangnam (latitude, longitude)
+DEFAULT_LAT = 37.4979
+DEFAULT_LNG = 127.0276
+DEFAULT_LOCATION_NAME = "서울시 강남구"
 
 # Curated fallback recommendations (used when no user profile or API unavailable)
 DEFAULT_RECOMMENDATIONS: List[dict] = [
@@ -114,6 +120,41 @@ async def search_naver_local(query: str) -> List[dict]:
         print(f"Naver API error: {e}")
     return []
 
+async def get_address_from_coords(lat: float, lng: float) -> str:
+    """Convert coordinates to a human-readable address using Kakao Local API."""
+    # Try REST_API_KEY first, fallback to NATIVE_APP_KEY if user only provided that
+    kakao_key = os.environ.get("KAKAO_REST_API_KEY") or os.environ.get("KAKAO_NATIVE_APP_KEY", "")
+    if not kakao_key:
+        print("Warning: Kakao API Key missing in environment.")
+        return DEFAULT_LOCATION_NAME
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                "https://dapi.kakao.com/v2/local/geo/coord2address.json",
+                params={"x": lng, "y": lat},
+                headers={"Authorization": f"KakaoAK {kakao_key}"}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                documents = data.get("documents", [])
+                if documents:
+                    # Prefer road address if available
+                    addr_info = documents[0]
+                    if addr_info.get("road_address"):
+                        # Extract region 2 (Gu) and region 3 (Dong)
+                        region = addr_info["road_address"]
+                        return f"{region.get('region_1depth_name', '')} {region.get('region_2depth_name', '')} {region.get('region_3depth_name', '')}".strip()
+                    elif addr_info.get("address"):
+                        region = addr_info["address"]
+                        return f"{region.get('region_1depth_name', '')} {region.get('region_2depth_name', '')} {region.get('region_3depth_name', '')}".strip()
+            else:
+                print(f"Kakao API Error: Status {response.status_code}, Response: {response.text}")
+    except Exception as e:
+        print(f"Kakao Reverse Geocoding error: {e}")
+    
+    return DEFAULT_LOCATION_NAME
+
 def get_user_profile_from_supabase(user_id: str) -> Optional[dict]:
     """Fetch user profile from Supabase. Returns None on any error."""
     try:
@@ -177,6 +218,12 @@ async def generate_personalized_query_and_reasons(
         print(f"LLM query generation error: {e}")
         return {"query": "맛집", "advice": "사용자 맞춤형 추천입니다."}
 
+@router.get("/address", response_model=dict)
+async def get_current_address(lat: float, lng: float):
+    """Returns a string address for the given coordinates."""
+    address = await get_address_from_coords(lat, lng)
+    return {"address": address}
+
 @router.get("/{user_id}", response_model=List[RestaurantRecommendation])
 async def get_recommendations(
     user_id: str, 
@@ -210,8 +257,17 @@ async def get_recommendations(
     query_text = llm_result.get("query", "맛집")
     personal_advice = llm_result.get("advice", "오늘의 건강한 선택을 도와드릴게요.")
 
-    # Location Context
-    location_prefix = "주변 " if lat and lng else "강남 "
+    # Location Context: Use provided coordinates, or fallback to profile location, or Gangnam
+    actual_lat = lat if lat is not None else DEFAULT_LAT
+    actual_lng = lng if lng is not None else DEFAULT_LNG
+    
+    location_prefix = "주변 "
+    if lat is None and lng is None:
+        if profile and profile.get("location"):
+            location_prefix = f"{profile.get('location')} "
+        else:
+            location_prefix = f"{DEFAULT_LOCATION_NAME} "
+    
     query = f"{location_prefix}{query_text}"
     
     naver_items = await search_naver_local(query)

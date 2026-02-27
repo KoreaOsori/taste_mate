@@ -42,6 +42,7 @@ export interface UserProfile {
     disliked_foods?: string[];
     restricted_foods?: string[];
     location?: string;
+    location_consent?: boolean;
 }
 
 export interface Restaurant {
@@ -101,6 +102,12 @@ export const recommendService = {
     getRecommendations: async (userId: string, lat?: number, lng?: number, weather?: string, hour?: number) => {
         const response = await apiClient.get<Restaurant[]>(`/recommend/${userId}`, {
             params: { lat, lng, weather, hour },
+        });
+        return response.data;
+    },
+    getAddress: async (lat: number, lng: number) => {
+        const response = await apiClient.get<{ address: string }>('/recommend/address', {
+            params: { lat, lng },
         });
         return response.data;
     },
