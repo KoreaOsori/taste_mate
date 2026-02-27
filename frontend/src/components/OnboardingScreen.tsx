@@ -4,7 +4,7 @@ import { ArrowRight, Target, Activity, Clock, Loader2, TrendingUp } from 'lucide
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { getSupabaseConfig } from '../utils/supabase-config';
+import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient';
 
 interface OnboardingScreenProps {
   onComplete: (profile: UserProfile) => void;
@@ -52,9 +52,10 @@ export function OnboardingScreen({ onComplete, userName = '' }: OnboardingScreen
 
     try {
       // Check if Supabase is configured
-      const { url, key, isConfigured } = getSupabaseConfig();
+      const url = supabaseUrl;
+      const key = supabaseAnonKey;
 
-      if (isConfigured) {
+      if (url && key) {
         // Try to save to backend, but don't block if it fails
         const response = await fetch(
           `${url}/functions/v1/make-server-4e0538b1/profile`,

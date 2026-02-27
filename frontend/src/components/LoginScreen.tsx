@@ -3,8 +3,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { ArrowRight, Loader2, UserCircle } from 'lucide-react';
-
 import logoImage from 'figma:asset/df871c26aa10ae23c0ba14499a1666fccdfbb972.png';
+import { supabase } from '../utils/supabaseClient';
 
 interface LoginScreenProps {
   onLoginSuccess: (userId: string) => void;
@@ -30,31 +30,45 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
 
-    // Check if user exists in localStorage
-    const savedUserId = localStorage.getItem('tastemate_userId');
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
 
-    if (savedUserId) {
-      onLoginSuccess(savedUserId);
-    } else {
-      setError('계정을 찾을 수 없습니다. 회원가입을 진행해주세요.');
+      if (data.user) {
+        onLoginSuccess(data.user.id);
+      }
+    } catch (err: any) {
+      setError('로그인 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
   };
 
   const handleKakaoLogin = async () => {
-    // 카카오 로그인 로직 (실제 카카오 SDK 연동 필요)
-    alert('카카오 로그인은 카카오 개발자 앱 설정이 필요합니다.\n데모 버전에서는 게스트 로그인을 이용해주세요.');
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (authError) throw authError;
+    } catch (err: any) {
+      setError('카카오 로그인 중 오류가 발생했습니다: ' + err.message);
+    }
   };
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-b from-green-50 to-white flex flex-col">
       <div className="flex-1 overflow-y-auto p-6 flex flex-col justify-center">
         <div className="max-w-md mx-auto w-full">
-          {/* Logo and Header */}
           <div className="text-center mb-8 pt-4">
             <div className="w-48 h-48 mx-auto mb-6">
               <img src={logoImage} alt="밥친구 로고" className="w-[1300px] h-[1300px] object-contain" />
@@ -62,7 +76,6 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
             <h1 className="text-4xl font-bold text-gray-900 mb-2">오늘 뭐먹지? 고민 끝!!</h1>
           </div>
 
-          {/* Login Form */}
           <div className="space-y-5">
             <div>
               <Label htmlFor="email">이메일</Label>
@@ -73,7 +86,7 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="example@email.com"
                 className="mt-1"
-                onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               />
             </div>
 
@@ -86,7 +99,7 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 placeholder="비밀번호를 입력하세요"
                 className="mt-1"
-                onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               />
             </div>
 
@@ -114,7 +127,6 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
               )}
             </Button>
 
-            {/* Social Login Divider */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300"></div>
@@ -124,7 +136,6 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
               </div>
             </div>
 
-            {/* Kakao Login Button */}
             <Button
               onClick={handleKakaoLogin}
               className="w-full h-12 text-base bg-[#FEE500] hover:bg-[#FDD835] text-gray-900 font-medium"
@@ -135,7 +146,6 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
               카카오 로그인
             </Button>
 
-            {/* Guest Login Button */}
             {onGuestLogin && (
               <Button
                 onClick={onGuestLogin}
@@ -164,7 +174,6 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
             </div>
           </div>
 
-          {/* Footer */}
           <div className="text-center text-xs text-gray-500 mt-6">
             밥친구와 함께 건강한 식습관을 만들어보세요
           </div>

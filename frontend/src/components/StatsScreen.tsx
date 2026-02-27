@@ -20,16 +20,16 @@ export function StatsScreen({ userProfile }: StatsScreenProps) {
     const days = ['월', '화', '수', '목', '금', '토', '일'];
     const data = days.map((day, index) => ({
       day,
-      calories: Math.floor(Math.random() * 500) + userProfile.targetCalories - 300,
+      calories: Math.floor(Math.random() * 500) + userProfile.target_calories - 300,
       protein: Math.floor(Math.random() * 30) + 50,
-      target: userProfile.targetCalories,
+      target: userProfile.target_calories,
     }));
     setWeeklyData(data);
   };
 
   const avgCalories = weeklyData.reduce((sum, d) => sum + d.calories, 0) / weeklyData.length || 0;
-  const caloriesTrend = avgCalories > userProfile.targetCalories ? 'over' : 'under';
-  const trendPercentage = Math.abs(((avgCalories - userProfile.targetCalories) / userProfile.targetCalories) * 100);
+  const caloriesTrend = avgCalories > userProfile.target_calories ? 'over' : 'under';
+  const trendPercentage = Math.abs(((avgCalories - userProfile.target_calories) / userProfile.target_calories) * 100);
 
   const achievements = [
     { icon: '🔥', title: '7일 연속 기록', description: '꾸준히 기록중!', earned: true },
@@ -51,21 +51,19 @@ export function StatsScreen({ userProfile }: StatsScreenProps) {
         <div className="bg-white rounded-xl shadow-sm p-1 flex gap-1">
           <button
             onClick={() => setSelectedPeriod('week')}
-            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedPeriod === 'week'
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedPeriod === 'week'
                 ? 'bg-green-600 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
-            }`}
+              }`}
           >
             주간
           </button>
           <button
             onClick={() => setSelectedPeriod('month')}
-            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedPeriod === 'month'
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedPeriod === 'month'
                 ? 'bg-green-600 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
-            }`}
+              }`}
           >
             월간
           </button>
@@ -180,23 +178,23 @@ export function StatsScreen({ userProfile }: StatsScreenProps) {
             </div>
             <div className="text-center">
               <p className="text-xs text-gray-600 mb-1">목표 체중</p>
-              <p className="text-xl font-bold text-green-600">{userProfile.targetWeight}kg</p>
+              <p className="text-xl font-bold text-green-600">{userProfile.target_weight}kg</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-gray-600 mb-1">남은 거리</p>
               <p className="text-xl font-bold text-blue-600">
-                {Math.abs(userProfile.weight - userProfile.targetWeight)}kg
+                {Math.abs(userProfile.weight - userProfile.target_weight)}kg
               </p>
             </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
-            <div 
+            <div
               className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all"
-              style={{ width: `${Math.min(((userProfile.weight - userProfile.targetWeight) / userProfile.weight) * 100, 100)}%` }}
+              style={{ width: `${Math.min(((userProfile.weight - userProfile.target_weight) / userProfile.weight) * 100, 100)}%` }}
             ></div>
           </div>
           <p className="text-xs text-gray-600 text-center mt-2">
-            목표까지 {Math.abs(userProfile.weight - userProfile.targetWeight)}kg 남았어요! 💪
+            목표까지 {Math.abs(userProfile.weight - userProfile.target_weight)}kg 남았어요! 💪
           </p>
         </div>
       </div>
@@ -212,11 +210,10 @@ export function StatsScreen({ userProfile }: StatsScreenProps) {
             {achievements.map((achievement, index) => (
               <div
                 key={index}
-                className={`p-4 rounded-xl border-2 ${
-                  achievement.earned
+                className={`p-4 rounded-xl border-2 ${achievement.earned
                     ? 'border-yellow-400 bg-yellow-50'
                     : 'border-gray-200 bg-gray-50 opacity-50'
-                }`}
+                  }`}
               >
                 <div className="text-3xl mb-2">{achievement.icon}</div>
                 <p className="font-medium text-gray-900 text-sm mb-1">{achievement.title}</p>

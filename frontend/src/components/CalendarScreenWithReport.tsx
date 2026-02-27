@@ -25,7 +25,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
   const [showAddMealDialog, setShowAddMealDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [newMeal, setNewMeal] = useState({
-    mealType: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+    type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
     foodName: '',
     calories: '',
     protein: '',
@@ -42,11 +42,11 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
         // In a real app, we might fetch the entire month. 
         // For now, we fetch for the currently selected date if it exists.
         if (selectedDate) {
-          const meals = await mealService.getMeals(userProfile.userId, selectedDate);
+          const meals = await mealService.getMeals(userProfile.user_id, selectedDate);
 
           const dayMeals: Meal[] = meals.map((m: any) => ({
             id: m.id || Math.random().toString(),
-            mealType: m.meal_type as any,
+            type: m.type as any,
             foodName: m.food_name,
             calories: m.calories,
             protein: m.protein || 0,
@@ -74,7 +74,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
     };
 
     fetchMonthMeals();
-  }, [selectedDate, userProfile.userId]);
+  }, [selectedDate, userProfile.user_id]);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -121,7 +121,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
   const monthName = currentDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
 
   const getCalorieStatus = (calories: number) => {
-    const target = userProfile.targetCalories;
+    const target = userProfile.target_calories;
     const diff = calories - target;
     const percentage = (diff / target) * 100;
 
@@ -139,8 +139,8 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
       setIsLoading(true);
       try {
         const mealToCreate = {
-          user_id: userProfile.userId,
-          meal_type: newMeal.mealType,
+          user_id: userProfile.user_id,
+          type: newMeal.type,
           food_name: newMeal.foodName,
           calories: parseFloat(newMeal.calories),
           protein: parseFloat(newMeal.protein) || 0,
@@ -154,7 +154,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
         // Update local state
         const updatedMeals: Meal[] = [...(calendarData[selectedDate]?.meals || []), {
           id: createdMeal.id || Math.random().toString(),
-          mealType: createdMeal.meal_type as any,
+          type: createdMeal.type as any,
           foodName: createdMeal.food_name,
           calories: createdMeal.calories,
           protein: createdMeal.protein || 0,
@@ -176,7 +176,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
 
         setShowAddMealDialog(false);
         setNewMeal({
-          mealType: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+          type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
           foodName: '',
           calories: '',
           protein: '',
@@ -313,7 +313,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
                     <StatusIcon className="w-5 h-5" />
                     <span className="font-medium">{status.text}</span>
                     <span className="text-sm text-gray-500">
-                      (목표: {userProfile.targetCalories}kcal)
+                      (목표: {userProfile.target_calories}kcal)
                     </span>
                   </div>
                 );
@@ -456,9 +456,9 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <span className="text-xs font-medium text-gray-500 uppercase">
-                          {meal.mealType === 'breakfast' ? '아침' :
-                            meal.mealType === 'lunch' ? '점심' :
-                              meal.mealType === 'dinner' ? '저녁' : '간식'}
+                          {meal.type === 'breakfast' ? '아침' :
+                            meal.type === 'lunch' ? '점심' :
+                              meal.type === 'dinner' ? '저녁' : '간식'}
                         </span>
                         <h5 className="font-medium text-gray-900 mt-1">{meal.foodName}</h5>
                         <p className="text-xs text-gray-500 mt-1">
@@ -509,16 +509,16 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
               <div className="space-y-2">
                 <Label htmlFor="mealType">식사 시간</Label>
                 <Select
-                  value={newMeal.mealType}
+                  value={newMeal.type}
                   onValueChange={(value: 'breakfast' | 'lunch' | 'dinner' | 'snack') =>
-                    setNewMeal({ ...newMeal, mealType: value })
+                    setNewMeal({ ...newMeal, type: value })
                   }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="식사 시간 선택">
-                      {newMeal.mealType === 'breakfast' ? '아침' :
-                        newMeal.mealType === 'lunch' ? '점심' :
-                          newMeal.mealType === 'dinner' ? '저녁' : '간식'}
+                      {newMeal.type === 'breakfast' ? '아침' :
+                        newMeal.type === 'lunch' ? '점심' :
+                          newMeal.type === 'dinner' ? '저녁' : '간식'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>

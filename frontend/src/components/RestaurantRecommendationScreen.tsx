@@ -150,7 +150,7 @@ export function RestaurantRecommendationScreen({ userProfile }: RestaurantRecomm
     setRestaurants(mockRestaurants);
   };
 
-  const filteredRestaurants = restaurants.filter(r => 
+  const filteredRestaurants = restaurants.filter(r =>
     filterCategory === 'all' || r.category === filterCategory
   );
 
@@ -162,7 +162,7 @@ export function RestaurantRecommendationScreen({ userProfile }: RestaurantRecomm
     }
   };
 
-  const remainingCalories = userProfile.targetCalories - userProfile.currentCalories;
+  const remainingCalories = userProfile.target_calories - userProfile.current_calories;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -212,11 +212,10 @@ export function RestaurantRecommendationScreen({ userProfile }: RestaurantRecomm
             <button
               key={category}
               onClick={() => setFilterCategory(category)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                filterCategory === category
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filterCategory === category
                   ? 'bg-green-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                }`}
             >
               {category === 'all' ? '전체' : category}
             </button>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { UserProfile, Meal, Screen } from '../App';
 import { Bell, TrendingUp, Apple, Flame, Activity, ChevronRight, Info, Users } from 'lucide-react';
 import { Progress } from './ui/progress';
-import { getSupabaseConfig } from '../utils/supabase-config';
+import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient';
 
 interface HomeScreenProps {
   userProfile: UserProfile;
@@ -51,15 +51,16 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
   const loadTodaysMeals = async () => {
     try {
       // Check if Supabase is configured
-      const { url, key, isConfigured } = getSupabaseConfig();
-      if (!isConfigured) {
+      const url = supabaseUrl;
+      const key = supabaseAnonKey;
+      if (!url || !key) {
         console.log('Supabase not configured, using local data only');
         return;
       }
 
       const today = new Date().toISOString().split('T')[0];
       const response = await fetch(
-        `${url}/functions/v1/make-server-4e0538b1/meals/${userProfile.userId}?date=${today}`,
+        `${url}/functions/v1/make-server-4e0538b1/meals/${userProfile.user_id}?date=${today}`,
         {
           headers: {
             'Authorization': `Bearer ${key}`,
@@ -98,8 +99,8 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
   };
 
   const totalCalories = todaysMeals.reduce((sum, meal) => sum + meal.calories, 0);
-  const calorieProgress = (totalCalories / userProfile.targetCalories) * 100;
-  const remainingCalories = userProfile.targetCalories - totalCalories;
+  const calorieProgress = (totalCalories / userProfile.target_calories) * 100;
+  const remainingCalories = userProfile.target_calories - totalCalories;
 
   const totalProtein = todaysMeals.reduce((sum, meal) => sum + (meal.protein || 0), 0);
   const totalCarbs = todaysMeals.reduce((sum, meal) => sum + (meal.carbs || 0), 0);
@@ -107,7 +108,7 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
 
   const ageGroupCalories = getAgeGroupCalories(userProfile.age, userProfile.gender);
   const bmi = (userProfile.weight / ((userProfile.height / 100) ** 2)).toFixed(1);
-  const targetBMI = (userProfile.targetWeight / ((userProfile.height / 100) ** 2)).toFixed(1);
+  const targetBMI = (userProfile.target_weight / ((userProfile.height / 100) ** 2)).toFixed(1);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -118,7 +119,7 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
             <h1 className="text-2xl font-bold mb-1">{greeting}, {userProfile.name}님! 👋</h1>
             <p className="text-green-100 text-sm">오늘도 건강한 하루 보내세요</p>
           </div>
-          <button 
+          <button
             onClick={() => onNavigate('profile')}
             className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
           >
@@ -133,7 +134,7 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
               <p className="text-green-100 text-sm mb-1">오늘의 칼로리</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-bold">{totalCalories}</span>
-                <span className="text-green-100">/ {userProfile.targetCalories} kcal</span>
+                <span className="text-green-100">/ {userProfile.target_calories} kcal</span>
               </div>
             </div>
             <div className="text-right">
@@ -143,9 +144,9 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
           </div>
           <Progress value={Math.min(calorieProgress, 100)} className="h-2 bg-white/20" />
           <p className="text-xs text-green-100 mt-2">
-            {calorieProgress < 80 ? '목표까지 순조롭게 진행 중이에요! 💪' : 
-             calorieProgress < 100 ? '거의 다 왔어요! 조금만 더 신경 써주세요' :
-             '오늘 목표를 초과했어요. 내일은 조절해볼까요?'}
+            {calorieProgress < 80 ? '목표까지 순조롭게 진행 중이에요! 💪' :
+              calorieProgress < 100 ? '거의 다 왔어요! 조금만 더 신경 써주세요' :
+                '오늘 목표를 초과했어요. 내일은 조절해볼까요?'}
           </p>
         </div>
       </div>
@@ -186,22 +187,22 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
             </div>
             <h3 className="font-bold text-gray-900">내 건강 정보</h3>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-white/60 rounded-lg p-3">
               <p className="text-xs text-gray-600 mb-1">현재 BMI</p>
               <p className="text-2xl font-bold text-gray-900">{bmi}</p>
               <p className="text-xs text-gray-500 mt-1">
-                {parseFloat(bmi) < 18.5 ? '저체중' : 
-                 parseFloat(bmi) < 23 ? '정상' : 
-                 parseFloat(bmi) < 25 ? '과체중' : '비만'}
+                {parseFloat(bmi) < 18.5 ? '저체중' :
+                  parseFloat(bmi) < 23 ? '정상' :
+                    parseFloat(bmi) < 25 ? '과체중' : '비만'}
               </p>
             </div>
             <div className="bg-white/60 rounded-lg p-3">
               <p className="text-xs text-gray-600 mb-1">목표 BMI</p>
               <p className="text-2xl font-bold text-green-600">{targetBMI}</p>
               <p className="text-xs text-gray-500 mt-1">
-                {Math.abs(userProfile.weight - userProfile.targetWeight).toFixed(1)}kg {userProfile.goal === 'lose' ? '감량' : userProfile.goal === 'gain' ? '증량' : '유지'}
+                {Math.abs(userProfile.weight - userProfile.target_weight).toFixed(1)}kg {userProfile.goal === 'lose' ? '감량' : userProfile.goal === 'gain' ? '증량' : '유지'}
               </p>
             </div>
           </div>
@@ -226,7 +227,7 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
               <div className="flex items-center gap-2 text-xs text-gray-600">
                 <Info className="w-3 h-3" />
                 <span>
-                  내 목표: <strong className="text-green-600">{userProfile.targetCalories} kcal</strong>
+                  내 목표: <strong className="text-green-600">{userProfile.target_calories} kcal</strong>
                   {' '}
                   ({userProfile.goal === 'lose' ? '체중감량' : userProfile.goal === 'gain' ? '체중증가' : '체중유지'} 기준)
                 </span>
@@ -240,7 +241,7 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
       <div className="px-6 mb-6">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-bold text-gray-900">오늘의 식사</h2>
-          <button 
+          <button
             onClick={() => onNavigate('meal-log')}
             className="text-sm text-green-600 font-medium"
           >
@@ -254,7 +255,7 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
               <Apple className="w-8 h-8 text-gray-400" />
             </div>
             <p className="text-gray-600 mb-3">아직 기록된 식사가 없어요</p>
-            <button 
+            <button
               onClick={() => onNavigate('meal-log')}
               className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
             >
@@ -270,8 +271,8 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-medium text-gray-500 uppercase">
                         {meal.mealType === 'breakfast' ? '아침' :
-                         meal.mealType === 'lunch' ? '점심' :
-                         meal.mealType === 'dinner' ? '저녁' : '간식'}
+                          meal.mealType === 'lunch' ? '점심' :
+                            meal.mealType === 'dinner' ? '저녁' : '간식'}
                       </span>
                       <span className="text-xs text-gray-400">
                         {new Date(meal.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
@@ -299,7 +300,7 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
       <div className="px-6 mb-6">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-bold text-gray-900">추천 메뉴</h2>
-          <button 
+          <button
             onClick={() => onNavigate('chat')}
             className="text-sm text-green-600 font-medium"
           >
@@ -334,7 +335,7 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
         <h2 className="text-lg font-bold text-gray-900 mb-3">빠른 메뉴</h2>
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => onNavigate('stats')}
+            onClick={() => onNavigate('calendar')}
             className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-5 text-left shadow-sm hover:shadow-md transition-shadow"
           >
             <TrendingUp className="w-8 h-8 mb-3" />

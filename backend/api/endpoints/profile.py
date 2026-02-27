@@ -35,9 +35,7 @@ async def get_profile(user_id: UUID4):
     response = supabase.table("profiles").select("*").eq("user_id", str(user_id)).execute()
     
     if not response.data:
-        # Return a default empty profile instead of 404 for demo purposes, 
-        # but in production we might want to handle this differently.
-        return UserProfile(user_id=user_id, name="User", target_calories=2000)
+        raise HTTPException(status_code=404, detail="Profile not found")
     
     return response.data[0]
 

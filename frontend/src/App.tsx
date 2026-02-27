@@ -13,7 +13,6 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { RestaurantRecommendationScreenNew } from './components/RestaurantRecommendationScreenNew';
 import { FoodFarmScreen } from './components/FoodFarmScreen';
 import { Home, Calendar, Users, PlusCircle, Utensils, User } from 'lucide-react';
-import { getSupabaseConfig } from './utils/supabase-config';
 import { profileService } from './api/apiClient';
 
 export type Screen = 'login' | 'signup' | 'location' | 'onboarding' | 'home' | 'chat' | 'community' | 'meal-log' | 'calendar' | 'health-report' | 'profile' | 'restaurant' | 'foodfarm';
@@ -41,7 +40,7 @@ export interface UserProfile {
 
 export interface Meal {
   id: string;
-  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   foodName: string;
   calories: number;
   protein: number;
@@ -75,39 +74,68 @@ export interface Comment {
   timestamp: string;
 }
 
+import { supabase } from './utils/supabaseClient';
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<Meal[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [signupData, setSignupData] = useState<{ userId: string; email: string; name: string } | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user has profile
-    const savedUserId = localStorage.getItem('tastemate_userId');
-    if (savedUserId) {
-      fetchUserProfile(savedUserId).finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
+    // Initial session check
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await fetchUserProfile(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+      if (event === 'SIGNED_IN' && session) {
+        await fetchUserProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setUserProfile(null);
+        setCurrentScreen('login');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
+    setAuthUserId(userId);
+    setIsLoading(true);
     try {
       const profile = await profileService.getProfile(userId);
       if (profile) {
-        // Handle field name consistency (backend returns snake_case now)
         setUserProfile(profile as unknown as UserProfile);
         setCurrentScreen('home');
       } else {
-        console.warn('Profile not found for userId:', userId);
+        // If logged in but no profile, send to onboarding
+        setCurrentScreen('location');
+      }
+    } catch (error: any) {
+      console.error('Error fetching profile:', error);
+      if (error.response && error.response.status === 404) {
+        // If profile doesn't exist, start onboarding
+        setCurrentScreen('location');
+      } else {
+        // For other errors, maybe show login again or guest mode
         setCurrentScreen('login');
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      // fallback to login on error
-      setCurrentScreen('login');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -205,7 +233,8 @@ export default function App() {
         {currentScreen === 'onboarding' && (
           <OnboardingScreenNew
             onComplete={handleOnboardingComplete}
-            userName={signupData?.name}
+            userId={authUserId || userProfile?.user_id || signupData?.userId || ''}
+            userName={userProfile?.name || signupData?.name}
           />
         )}
         {currentScreen === 'home' && userProfile && (
@@ -230,7 +259,10 @@ export default function App() {
           />
         )}
         {currentScreen === 'restaurant' && userProfile && (
-          <RestaurantRecommendationScreenNew userProfile={userProfile} />
+          <RestaurantRecommendationScreenNew
+            userProfile={userProfile}
+            userLocation={userLocation}
+          />
         )}
         {currentScreen === 'foodfarm' && userProfile && (
           <FoodFarmScreen userProfile={userProfile} />
@@ -248,7 +280,8 @@ export default function App() {
           <ProfileScreen
             userProfile={userProfile}
             setUserProfile={setUserProfile}
-            onLogout={() => {
+            onLogout={async () => {
+              await supabase.auth.signOut();
               localStorage.removeItem('tastemate_userId');
               setUserProfile(null);
               setSignupData(null);

@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
-import { Star, MapPin, Check, MapPinned, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Star, MapPin, X, Heart, RefreshCcw, Info } from 'lucide-react';
 
 interface Restaurant {
   id: string;
@@ -27,203 +28,172 @@ interface RestaurantRecommendationCardViewProps {
   restaurants: Restaurant[];
   onSelectRestaurant: (restaurant: Restaurant) => void;
   onShowFeedback: (restaurant: { name: string; menu: string }) => void;
+  onRefresh?: () => void;
 }
 
 export function RestaurantRecommendationCardView({
   restaurants,
   onSelectRestaurant,
-  onShowFeedback
+  onShowFeedback,
+  onRefresh
 }: RestaurantRecommendationCardViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const touchStartX = useRef<number>(0);
-  const touchEndX = useRef<number>(0);
+  const [exitX, setExitX] = useState<number | string>(0);
 
-  const handleNext = () => {
-    if (currentIndex < restaurants.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+  const handleSwipe = (direction: 'left' | 'right') => {
+    setExitX(direction === 'left' ? -1000 : 1000);
+    setTimeout(() => {
+      if (currentIndex < restaurants.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+        setExitX(0);
+      } else {
+        // 모든 카드를 다 봤을 때 처리 (예: 처음으로 돌아가거나 새로고침 유도)
+        alert('모든 추천을 확인했습니다! 다시 추천받아보세요.');
+        onRefresh?.();
+      }
+    }, 200);
+  };
+
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+    } else {
+      setCurrentIndex(0);
     }
   };
 
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = () => {
-    if (touchStartX.current - touchEndX.current > 50) {
-      handleNext();
-    }
-    if (touchEndX.current - touchStartX.current > 50) {
-      handlePrevious();
-    }
-  };
-
-  if (restaurants.length === 0) return null;
+  if (restaurants.length === 0 || currentIndex >= restaurants.length) {
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
+          <RefreshCcw className="w-10 h-10 text-green-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">모든 추천을 다 보셨어요!</h2>
+        <p className="text-gray-600 mb-6">새로운 맛집을 찾으러 가볼까요?</p>
+        <button
+          onClick={handleRefresh}
+          className="px-8 py-3 bg-green-600 text-white rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all"
+        >
+          다시 추천받기
+        </button>
+      </div>
+    );
+  }
 
   const currentRestaurant = restaurants[currentIndex];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white pb-20">
+    <div className="relative h-[calc(100vh-140px)] flex flex-col items-center justify-between bg-white overflow-hidden p-4">
       {/* Header */}
-      <div className="px-6 pt-8 pb-4">
-        <h1 className="text-3xl font-bold text-gray-900 text-center mb-2">
-          오늘은 이걸로!
-        </h1>
-        <p className="text-center text-gray-600 text-base">
+      <div className="w-full flex items-center justify-between px-2 mb-4">
+        <h2 className="text-2xl font-black text-gray-900 tracking-tight">오늘의 추천</h2>
+        <div className="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-sm">
           {currentIndex + 1} / {restaurants.length}
-        </p>
+        </div>
       </div>
 
-      {/* Card Stack - Full width */}
-      <div
-        className="px-4 py-2"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div className="relative">
-          {/* Main Card */}
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-            {/* Image Section - Much bigger */}
-            <div className="relative h-96">
+      {/* Card Container */}
+      <div className="relative w-full flex-1 max-w-md perspective-1000">
+        <AnimatePresence>
+          <motion.div
+            key={currentRestaurant.id}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.x > 100) handleSwipe('right');
+              else if (info.offset.x < -100) handleSwipe('left');
+            }}
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ x: exitX, opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
+            className="absolute inset-0 bg-white rounded-3xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing border border-gray-100"
+          >
+            {/* Image Section */}
+            <div
+              className="relative h-full w-full"
+              onClick={() => onSelectRestaurant(currentRestaurant)}
+            >
               <img
                 src={currentRestaurant.imageUrl}
                 alt={currentRestaurant.name}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/0" />
+              {/* Gradient Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/0" />
 
-              {/* Category Badge */}
-              <div className="absolute top-6 left-6 bg-green-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                {currentRestaurant.category}
+              {/* Detail Info Indicator */}
+              <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md rounded-full p-2">
+                <Info className="w-5 h-5 text-white" />
               </div>
 
-              {/* Bottom Info Overlay - Bigger text */}
-              <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                <h2 className="text-3xl font-bold mb-2">{currentRestaurant.name}</h2>
-                <div className="flex items-center gap-4 text-base">
-                  <div className="flex items-center gap-1.5">
-                    <Star className="w-5 h-5 fill-white" />
+              {/* Bottom Info Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                <h3 className="text-4xl font-bold mb-2 drop-shadow-lg">{currentRestaurant.name}</h3>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     <span className="font-bold">{currentRestaurant.rating}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="w-5 h-5" />
+                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                    <MapPin className="w-4 h-4" />
                     <span>{currentRestaurant.distance}km</span>
                   </div>
                 </div>
+
+                <p className="text-lg font-medium bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/20 line-clamp-2">
+                  "{currentRestaurant.reason}"
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="bg-green-500/80 backdrop-blur-sm text-white px-3 py-1 rounded-lg text-sm font-bold">
+                    {currentRestaurant.category}
+                  </span>
+                  <span className="bg-blue-500/80 backdrop-blur-sm text-white px-3 py-1 rounded-lg text-sm font-bold">
+                    {currentRestaurant.signatureCalories}kcal
+                  </span>
+                </div>
               </div>
+
+              {/* Swipe Stamps */}
+              {/* These appear while dragging - simplified for now */}
             </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
-            {/* Content Section - Bigger padding and text */}
-            <div className="p-6 space-y-5">
-              {/* Signature Menu */}
-              <div className="bg-green-50 rounded-3xl p-6 border-2 border-green-100">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-600 mb-2">추천 메뉴</p>
-                    <p className="font-bold text-gray-900 text-2xl">{currentRestaurant.signature}</p>
-                  </div>
-                  <p className="text-2xl font-bold text-green-600">{currentRestaurant.price}</p>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  <span className="font-semibold">{currentRestaurant.signatureCalories}kcal</span>
-                  <span>•</span>
-                  <span>배달 {currentRestaurant.deliveryTime}</span>
-                </div>
-              </div>
-
-              {/* Recommendation Reason - Bigger */}
-              <div className="bg-blue-50 rounded-3xl p-6 border-2 border-blue-100">
-                <div className="flex items-start gap-3">
-                  <span className="text-3xl">💬</span>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-600 mb-2">밥친구의 추천 이유</p>
-                    <p className="text-base text-gray-900 leading-relaxed font-medium">{currentRestaurant.reason}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons - Bigger */}
-              <div className="space-y-3 pt-2">
-                <button
-                  onClick={() => onSelectRestaurant(currentRestaurant)}
-                  className="flex items-center justify-center gap-3 w-full px-6 py-5 bg-green-600 text-white rounded-3xl font-bold text-xl hover:bg-green-700 transition-all shadow-xl"
-                >
-                  <Check className="w-6 h-6" />
-                  이거 먹을게요!
-                </button>
-
-                <a
-                  href={currentRestaurant.naverLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-3 w-full px-6 py-4 border-2 border-gray-300 text-gray-700 rounded-3xl font-semibold text-lg hover:bg-gray-50 transition-colors"
-                >
-                  <MapPinned className="w-6 h-6" />
-                  식당 정보 보기
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation Arrows */}
-          {currentIndex > 0 && (
-            <button
-              onClick={handlePrevious}
-              className="absolute left-0 top-1/3 -translate-y-1/2 -translate-x-5 w-14 h-14 rounded-full bg-white shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-10"
-            >
-              <ChevronLeft className="w-7 h-7 text-gray-900" />
-            </button>
-          )}
-
-          {currentIndex < restaurants.length - 1 && (
-            <button
-              onClick={handleNext}
-              className="absolute right-0 top-1/3 -translate-y-1/2 translate-x-5 w-14 h-14 rounded-full bg-white shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-10"
-            >
-              <ChevronRight className="w-7 h-7 text-gray-900" />
-            </button>
-          )}
-        </div>
-
-        {/* Pagination Dots */}
-        <div className="flex items-center justify-center gap-2 mt-6">
-          {restaurants.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`h-2.5 rounded-full transition-all ${index === currentIndex ? 'bg-green-600 w-10' : 'bg-gray-300 w-2.5'
-                }`}
-            />
-          ))}
-        </div>
-
-        {/* Swipe Hint - Bigger */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
-            👈 좌우로 스와이프 👉
-          </p>
-        </div>
-
-        {/* Test Feedback Button */}
+      {/* Action Buttons */}
+      <div className="w-full flex items-center justify-center gap-6 py-6 mt-4">
+        {/* Dislike - Slide Left */}
         <button
-          onClick={() => onShowFeedback({
-            name: currentRestaurant.name,
-            menu: currentRestaurant.signature
-          })}
-          className="mt-4 w-full py-2 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200 transition-colors"
+          onClick={() => handleSwipe('left')}
+          className="w-16 h-16 rounded-full bg-white shadow-xl flex items-center justify-center border-2 border-red-50 text-red-500 hover:scale-110 active:scale-95 transition-all"
+          title="추천받지 않기"
         >
-          🔹 피드백 팝업 미리보기 (테스트용)
+          <X className="w-8 h-8" />
         </button>
+
+        {/* Refresh */}
+        <button
+          onClick={handleRefresh}
+          className="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-gray-50 text-gray-400 hover:rotate-180 transition-all duration-500"
+          title="다시 추천받기"
+        >
+          <RefreshCcw className="w-5 h-5" />
+        </button>
+
+        {/* Like - Slide Right */}
+        <button
+          onClick={() => handleSwipe('right')}
+          className="w-16 h-16 rounded-full bg-white shadow-xl flex items-center justify-center border-2 border-green-50 text-green-500 hover:scale-110 active:scale-95 transition-all"
+          title="찜하기"
+        >
+          <Heart className="w-8 h-8" />
+        </button>
+      </div>
+
+      {/* Mobile Hint */}
+      <div className="text-xs text-gray-400 font-medium animate-bounce mb-2">
+        사진을 클릭하면 상세 정보를 볼 수 있어요!
       </div>
     </div>
   );

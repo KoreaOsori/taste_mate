@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserProfile } from '../App';
-import { MapPin, Star, ExternalLink, Check, ChevronLeft, ChevronRight, RefreshCw, Navigation, Car, MapPinned, ArrowRight, Sparkles, Zap, MessageCircle } from 'lucide-react';
+import { MapPin, Star, ExternalLink, Check, ChevronLeft, ChevronRight, RefreshCw, Navigation, Car, MapPinned, ArrowRight, Sparkles, Zap, MessageCircle, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { RecommendationLoadingScreen } from './RecommendationLoadingScreen';
@@ -11,6 +11,7 @@ import { recommendService } from '../api/apiClient';
 
 interface RestaurantRecommendationScreenNewProps {
   userProfile: UserProfile;
+  userLocation?: { latitude: number; longitude: number } | null;
 }
 
 interface Restaurant {
@@ -37,7 +38,7 @@ interface Restaurant {
 
 type QuestionStep = 'initial' | 'emotion' | 'companion' | 'preference' | 'budget' | 'loading' | 'result';
 
-export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRecommendationScreenNewProps) {
+export function RestaurantRecommendationScreenNew({ userProfile, userLocation }: RestaurantRecommendationScreenNewProps) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -58,8 +59,12 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
   const [userLocationData, setUserLocationData] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    // Get user location and weather
-    if (navigator.geolocation) {
+    // Priority: 1. Props from App.tsx, 2. Geolocation API, 3. Default (Seoul)
+    if (userLocation) {
+      const { latitude, longitude } = userLocation;
+      setUserLocationData({ lat: latitude, lng: longitude });
+      fetchWeather(latitude, longitude);
+    } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
@@ -67,14 +72,14 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
           fetchWeather(latitude, longitude);
         },
         (error) => {
-          console.log('Location permission denied, using default location');
-          // Default to Seoul
-          setUserLocationData({ lat: 37.5665, lng: 126.9780 });
-          fetchWeather(37.5665, 126.9780);
+          console.warn('Geolocation failed or denied:', error);
+          const defaultLoc = { lat: 37.5665, lng: 126.9780 };
+          setUserLocationData(defaultLoc);
+          fetchWeather(defaultLoc.lat, defaultLoc.lng);
         }
       );
     }
-  }, []);
+  }, [userLocation]);
 
   const fetchWeather = async (lat: number, lng: number) => {
     try {
@@ -215,10 +220,15 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
     ];
 
     try {
+      const currentHour = new Date().getHours();
+      const weather = weatherData?.condition || '맑음';
+
       const data = await recommendService.getRecommendations(
         userProfile.user_id,
         userLocationData?.lat,
-        userLocationData?.lng
+        userLocationData?.lng,
+        weather,
+        currentHour
       );
       if (data && data.length > 0) {
         setRestaurants(data);
@@ -571,38 +581,115 @@ export function RestaurantRecommendationScreenNew({ userProfile }: RestaurantRec
             setFeedbackRestaurant(restaurant);
             setShowFeedbackModal(true);
           }}
+          onRefresh={() => generateRecommendations(isQuickMode)}
         />
 
-        {/* Order Confirmation Modal */}
+        {/* Detailed Info Modal */}
         <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>이 메뉴를 선택하시겠어요?</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="sm:max-w-md rounded-t-3xl sm:rounded-3xl p-0 overflow-hidden border-none max-h-[90vh] flex flex-col">
+            <DialogHeader className="p-0">
+              <div className="relative h-64 w-full">
                 {selectedRestaurant && (
                   <>
-                    <div className="mt-4 text-center">
-                      <p className="text-base font-bold text-gray-900">{selectedRestaurant.name}</p>
-                      <p className="text-sm text-gray-600 mt-1">{selectedRestaurant.signature}</p>
+                    <img
+                      src={selectedRestaurant.imageUrl}
+                      alt={selectedRestaurant.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                    <button
+                      onClick={() => setShowOrderModal(false)}
+                      className="absolute top-4 right-4 w-10 h-10 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-all"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                    <div className="absolute bottom-6 left-6 text-white text-left">
+                      <p className="text-sm font-bold text-green-400 mb-1">{selectedRestaurant.category}</p>
+                      <DialogTitle className="text-3xl font-bold text-white mb-0">{selectedRestaurant.name}</DialogTitle>
                     </div>
                   </>
                 )}
-              </DialogDescription>
+              </div>
             </DialogHeader>
-            <div className="flex gap-3 mt-4">
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {selectedRestaurant && (
+                <>
+                  {/* Price and Details */}
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-4 text-left">
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">대표 메뉴</p>
+                      <p className="text-xl font-bold text-gray-900">{selectedRestaurant.signature}</p>
+                    </div>
+                    <div className="text-right text-left">
+                      <p className="text-sm text-gray-500 mb-1">가격</p>
+                      <p className="text-xl font-bold text-green-600">{selectedRestaurant.price}</p>
+                    </div>
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-3 gap-4 text-left">
+                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center">
+                      <Zap className="w-5 h-5 text-orange-500 mb-1" />
+                      <span className="text-xs text-gray-500">열량</span>
+                      <span className="font-bold text-gray-900">{selectedRestaurant.signatureCalories}kcal</span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center">
+                      <Navigation className="w-5 h-5 text-blue-500 mb-1" />
+                      <span className="text-xs text-gray-500">거리</span>
+                      <span className="font-bold text-gray-900">{selectedRestaurant.distance}km</span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center">
+                      <Star className="w-5 h-5 text-yellow-500 mb-1" />
+                      <span className="text-xs text-gray-500">평점</span>
+                      <span className="font-bold text-gray-900">{selectedRestaurant.rating}</span>
+                    </div>
+                  </div>
+
+                  {/* Nutrients */}
+                  <div className="space-y-3 text-left">
+                    <p className="text-sm font-bold text-gray-900">영양 정보</p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">단백질</span>
+                        <span className="font-medium text-gray-900">{selectedRestaurant.protein}g</span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-2 rounded-full">
+                        <div className="bg-green-500 h-2 rounded-full" style={{ width: '60%' }} />
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">탄수화물</span>
+                        <span className="font-medium text-gray-900">{selectedRestaurant.carbs}g</span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-2 rounded-full">
+                        <div className="bg-blue-500 h-2 rounded-full" style={{ width: '45%' }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location Info */}
+                  <div className="flex gap-4 items-start bg-green-50 p-4 rounded-2xl text-left">
+                    <MapPin className="w-6 h-6 text-green-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 mb-1">식당 위치</p>
+                      <p className="text-xs text-gray-600 leading-relaxed">{selectedRestaurant.address}</p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-6 pt-0">
               <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowOrderModal(false)}
-              >
-                취소
-              </Button>
-              <Button
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="w-full h-14 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold text-lg shadow-xl shadow-green-100 flex items-center justify-center gap-2"
                 onClick={() => selectedRestaurant && handleConfirmOrder(selectedRestaurant)}
               >
-                네, 이거 먹을게요!
+                <Check className="w-6 h-6" />
+                좋아요, 이걸로 먹을게요!
               </Button>
+              <p className="text-center text-[10px] text-gray-400 mt-3">
+                버튼 클릭 시 상세 지도 또는 배달 앱으로 이동합니다.
+              </p>
             </div>
           </DialogContent>
         </Dialog>

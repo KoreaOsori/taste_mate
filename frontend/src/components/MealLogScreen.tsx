@@ -16,7 +16,7 @@ interface MealLogScreenProps {
 export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, updateCurrentCalories }: MealLogScreenProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
-    mealType: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+    type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
     foodName: '',
     calories: '',
     protein: '',
@@ -30,7 +30,7 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
 
     const newMeal: Meal = {
       id: crypto.randomUUID(),
-      mealType: formData.mealType,
+      type: formData.type,
       foodName: formData.foodName,
       calories: parseInt(formData.calories),
       protein: parseInt(formData.protein) || 0,
@@ -44,7 +44,7 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
       // Send to FastAPI backend
       const saved = await mealService.createMeal({
         user_id: userProfile.user_id,
-        meal_type: formData.mealType,
+        type: formData.type,
         food_name: formData.foodName,
         calories: parseInt(formData.calories),
         protein: parseInt(formData.protein) || 0,
@@ -63,7 +63,7 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
       updateCurrentCalories(newMeal.calories);
 
       setFormData({
-        mealType: 'lunch',
+        type: 'lunch',
         foodName: '',
         calories: '',
         protein: '',
@@ -113,10 +113,10 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
 
   const totalCalories = todaysMeals.reduce((sum, meal) => sum + meal.calories, 0);
   const mealsByType = {
-    breakfast: todaysMeals.filter(m => m.mealType === 'breakfast'),
-    lunch: todaysMeals.filter(m => m.mealType === 'lunch'),
-    dinner: todaysMeals.filter(m => m.mealType === 'dinner'),
-    snack: todaysMeals.filter(m => m.mealType === 'snack'),
+    breakfast: todaysMeals.filter(m => m.type === 'breakfast'),
+    lunch: todaysMeals.filter(m => m.type === 'lunch'),
+    dinner: todaysMeals.filter(m => m.type === 'dinner'),
+    snack: todaysMeals.filter(m => m.type === 'snack'),
   };
 
   return (
@@ -250,8 +250,8 @@ export function MealLogScreen({ userProfile, todaysMeals, setTodaysMeals, update
                   ].map((type) => (
                     <button
                       key={type.value}
-                      onClick={() => setFormData({ ...formData, mealType: type.value as any })}
-                      className={`p-3 rounded-lg border-2 transition-all ${formData.mealType === type.value
+                      onClick={() => setFormData({ ...formData, type: type.value as any })}
+                      className={`p-3 rounded-lg border-2 transition-all ${formData.type === type.value
                         ? 'border-green-600 bg-green-50'
                         : 'border-gray-200'
                         }`}

@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { getSupabaseConfig } from '../utils/supabase-config';
+import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient';
 
 interface CommunityScreenProps {
   userProfile: UserProfile;
@@ -28,9 +28,10 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
 
   const loadPosts = async () => {
     try {
-      const { url, key, isConfigured } = getSupabaseConfig();
-      
-      if (!isConfigured) {
+      const url = supabaseUrl;
+      const key = supabaseAnonKey;
+
+      if (!url || !key) {
         console.log('Supabase not configured, using local data only');
         return;
       }
@@ -57,10 +58,10 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
     if (!formData.content.trim()) return;
 
     const tags = formData.tags.split(',').map(t => t.trim()).filter(t => t);
-    
+
     const newPost: CommunityPost = {
       id: crypto.randomUUID(),
-      userId: userProfile.userId,
+      user_id: userProfile.user_id,
       userName: userProfile.name,
       content: formData.content,
       calories: formData.calories ? parseInt(formData.calories) : undefined,
@@ -72,9 +73,10 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
     };
 
     try {
-      const { url, key, isConfigured } = getSupabaseConfig();
-      
-      if (isConfigured) {
+      const url = supabaseUrl;
+      const key = supabaseAnonKey;
+
+      if (url && key) {
         const response = await fetch(
           `${url}/functions/v1/make-server-4e0538b1/community/posts`,
           {
@@ -84,7 +86,7 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
               'Authorization': `Bearer ${key}`,
             },
             body: JSON.stringify({
-              userId: userProfile.userId,
+              user_id: userProfile.user_id,
               userName: userProfile.name,
               content: formData.content,
               calories: formData.calories ? parseInt(formData.calories) : undefined,
@@ -113,9 +115,10 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
 
   const handleLike = async (postId: string) => {
     try {
-      const { url, key, isConfigured } = getSupabaseConfig();
-      
-      if (!isConfigured) {
+      const url = supabaseUrl;
+      const key = supabaseAnonKey;
+
+      if (!url || !key) {
         return;
       }
 
@@ -175,11 +178,10 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
             <button
               key={filter.value}
               onClick={() => setSelectedFilter(filter.value as any)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                selectedFilter === filter.value
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${selectedFilter === filter.value
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
             >
               {filter.label}
             </button>
@@ -298,9 +300,10 @@ function PostCard({ post, onLike, userProfile }: { post: CommunityPost; onLike: 
     if (!commentText.trim()) return;
 
     try {
-      const { url, key, isConfigured } = getSupabaseConfig();
-      
-      if (!isConfigured) {
+      const url = supabaseUrl;
+      const key = supabaseAnonKey;
+
+      if (!url || !key) {
         return;
       }
 
@@ -313,7 +316,7 @@ function PostCard({ post, onLike, userProfile }: { post: CommunityPost; onLike: 
             'Authorization': `Bearer ${key}`,
           },
           body: JSON.stringify({
-            userId: userProfile.userId,
+            user_id: userProfile.user_id,
             userName: userProfile.name,
             content: commentText,
           }),

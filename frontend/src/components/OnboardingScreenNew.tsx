@@ -4,11 +4,12 @@ import { ArrowRight, Clock, Utensils, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { getSupabaseConfig } from '../utils/supabase-config';
+import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient';
 import { profileService } from '../api/apiClient';
 
 interface OnboardingScreenProps {
   onComplete: (profile: UserProfile) => void;
+  userId: string;
   userName?: string;
 }
 
@@ -27,7 +28,7 @@ const foodCategories = [
   { id: 'healthy', label: '건강식', emoji: '🥙' },
 ];
 
-export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScreenProps) {
+export function OnboardingScreenNew({ onComplete, userId, userName = '' }: OnboardingScreenProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -94,7 +95,7 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
     const targetCalories = calculateTargetCalories();
 
     const profile: any = {
-      user_id: crypto.randomUUID(),
+      user_id: userId,
       name: formData.name,
       age: parseInt(formData.age) || 25,
       gender: formData.gender,
@@ -150,10 +151,10 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
       </div>
 
       {/* Content (Scrollable) */}
-      <div className="flex-1 overflow-y-auto px-6 py-8">
-        <div className="max-w-md mx-auto">
+      <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col">
+        <div className="max-w-md mx-auto w-full my-auto">
           {step === 1 && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold text-gray-900">기본 신체 정보</h1>
                 <p className="text-sm text-gray-500">정확한 영양 분석을 위해 반드시 필요해요 (필수)</p>
@@ -227,13 +228,13 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
           )}
 
           {step === 2 && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold text-gray-900">식사 시간 설정</h1>
                 <p className="text-sm text-gray-500">정해진 시간에 맞춰 알림을 보내드릴게요 (필수)</p>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-3">
                 {[
                   { label: '아침 식사', id: 'breakfastTime', icon: '🌅' },
                   { label: '점심 식사', id: 'lunchTime', icon: '☀️' },
@@ -258,13 +259,13 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
           )}
 
           {step === 3 && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold text-gray-900">식사 취향 및 제한</h1>
                 <p className="text-sm text-gray-500">좋아하는 음식과 피하고 싶은 음식을 알려주세요 (선택)</p>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="space-y-3">
                   <Label className="text-gray-900 font-bold">선호하는 음식 (복수 선택)</Label>
                   <div className="grid grid-cols-3 gap-2">
@@ -300,13 +301,13 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
           )}
 
           {step === 4 && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold text-gray-900">목표 및 활동량</h1>
                 <p className="text-sm text-gray-500">목표 달성을 위한 칼로리를 계산해 드려요 (선택)</p>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="space-y-3">
                   <Label className="text-gray-900 font-bold">나의 목표</Label>
                   <div className="grid grid-cols-3 gap-2">
@@ -355,41 +356,38 @@ export function OnboardingScreenNew({ onComplete, userName = '' }: OnboardingScr
               </div>
             </div>
           )}
+
+          {/* Buttons (Moved into content area to reduce gap) */}
+          <div className="mt-8 flex gap-3 pb-4">
+            <div className="flex-1">
+              {step > 1 && (
+                <Button
+                  onClick={() => setStep(step - 1)}
+                  variant="outline"
+                  className="w-full h-12 border-gray-200 text-gray-600 font-bold"
+                  disabled={isSubmitting}
+                >
+                  이전
+                </Button>
+              )}
+            </div>
+
+            <div className="flex-1">
+              <Button
+                onClick={step === totalSteps ? handleSubmit : () => setStep(step + 1)}
+                disabled={isSubmitting || (step === 1 && (!formData.name || !formData.age || !formData.height || !formData.weight))}
+                className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-lg shadow-green-100"
+              >
+                {step === totalSteps
+                  ? (isSubmitting ? <Loader2 className="animate-spin" /> : '프로필 완성하기 🎉')
+                  : '다음 단계로'
+                }
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Buttons (Fixed at Bottom) */}
-      <div className="bg-white px-6 py-6 border-t border-gray-100 flex-none bg-white/80 backdrop-blur-md">
-        <div className="max-w-md mx-auto flex gap-3">
-          {step > 1 && (
-            <Button
-              onClick={() => setStep(step - 1)}
-              variant="outline"
-              className="flex-1 h-12 border-gray-200 text-gray-600 font-bold"
-              disabled={isSubmitting}
-            >
-              이전
-            </Button>
-          )}
-          {step < totalSteps ? (
-            <Button
-              onClick={() => setStep(step + 1)}
-              disabled={step === 1 && (!formData.name || !formData.age || !formData.height || !formData.weight)}
-              className="flex-[2] h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-lg shadow-green-100"
-            >
-              다음 단계로
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex-[2] h-12 bg-green-600 hover:bg-green-700 text-white font-bold shadow-lg shadow-green-100"
-            >
-              {isSubmitting ? <Loader2 className="animate-spin" /> : '프로필 완성하기 🎉'}
-            </Button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

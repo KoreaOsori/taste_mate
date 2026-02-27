@@ -13,7 +13,7 @@ const apiClient = axios.create({
 export interface MealRecord {
     id?: string;
     user_id: string;
-    meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
     food_name: string;
     calories: number;
     protein?: number;
@@ -98,9 +98,9 @@ export const profileService = {
 };
 
 export const recommendService = {
-    getRecommendations: async (userId: string, lat?: number, lng?: number) => {
+    getRecommendations: async (userId: string, lat?: number, lng?: number, weather?: string, hour?: number) => {
         const response = await apiClient.get<Restaurant[]>(`/recommend/${userId}`, {
-            params: { lat, lng },
+            params: { lat, lng, weather, hour },
         });
         return response.data;
     },

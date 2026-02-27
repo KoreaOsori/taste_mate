@@ -62,8 +62,8 @@ def build_system_prompt(user_profile: Optional[dict]) -> str:
         "health": "건강 유지 (항산화·미네랄 풍부한 식품 위주)",
     }
     goal = goal_map.get(str(user_profile.get("goal", "")), "건강 관리")
-    target_cal = int(user_profile.get("targetCalories", 2000))
-    current_cal = int(user_profile.get("currentCalories", 0))
+    target_cal = int(user_profile.get("target_calories", 2000))
+    current_cal = int(user_profile.get("current_calories", 0))
     remaining_cal = max(0, target_cal - current_cal)
     weight = user_profile.get("weight")
 

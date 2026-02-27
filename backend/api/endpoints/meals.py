@@ -8,7 +8,7 @@ router = APIRouter()
 class MealRecord(BaseModel):
     id: Optional[UUID4] = None
     user_id: UUID4
-    meal_type: str # breakfast, lunch, dinner, snack
+    type: str # breakfast, lunch, dinner, snack
     food_name: str
     calories: float
     protein: Optional[float] = None
@@ -34,6 +34,7 @@ async def get_meals(user_id: UUID4, date: Optional[str] = None):
         query = query.gte("timestamp", f"{date}T00:00:00Z").lte("timestamp", f"{date}T23:59:59Z")
         
     response = query.execute()
+    # Map 'type' from DB to Pydantic if necessary, but here they match
     return response.data
 
 @router.post("/", response_model=MealRecord)

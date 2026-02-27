@@ -4,7 +4,7 @@ import { User, Settings, Bell, Lock, HelpCircle, LogOut, ChevronRight, Edit2, Ma
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { getSupabaseConfig } from '../utils/supabase-config';
+import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient';
 
 interface ProfileScreenProps {
   userProfile: UserProfile;
@@ -15,15 +15,23 @@ interface ProfileScreenProps {
 export function ProfileScreen({ userProfile, setUserProfile, onLogout }: ProfileScreenProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [formData, setFormData] = useState({
-    name: userProfile.name,
-    age: userProfile.age.toString(),
-    height: userProfile.height.toString(),
-    weight: userProfile.weight.toString(),
-    target_weight: userProfile.target_weight.toString(),
-    breakfast_time: userProfile.breakfast_time,
-    lunch_time: userProfile.lunch_time,
-    dinner_time: userProfile.dinner_time,
+    name: userProfile?.name || '',
+    age: userProfile?.age?.toString() || '',
+    height: userProfile?.height?.toString() || '',
+    weight: userProfile?.weight?.toString() || '',
+    target_weight: userProfile?.target_weight?.toString() || '',
+    breakfast_time: userProfile?.breakfast_time || '08:00',
+    lunch_time: userProfile?.lunch_time || '12:00',
+    dinner_time: userProfile?.dinner_time || '18:00',
   });
+
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   const handleSave = async () => {
     const updatedProfile = {
@@ -39,9 +47,10 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
     };
 
     try {
-      const { url, key, isConfigured } = getSupabaseConfig();
+      const url = supabaseUrl;
+      const key = supabaseAnonKey;
 
-      if (isConfigured) {
+      if (url && key) {
         const response = await fetch(
           `${url}/functions/v1/make-server-4e0538b1/profile/${userProfile.user_id}`,
           {

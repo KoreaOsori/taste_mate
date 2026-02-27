@@ -127,53 +127,99 @@ def get_user_profile_from_supabase(user_id: str) -> Optional[dict]:
     return None
 
 
-@router.get("/{user_id}", response_model=List[RestaurantRecommendation])
-async def get_recommendations(user_id: str, lat: Optional[float] = None, lng: Optional[float] = None):
+async def generate_personalized_query_and_reasons(
+    user_id: str,
+    profile: Optional[dict],
+    meals: List[dict],
+    weather: str,
+    hour: int
+) -> dict:
     """
-    Returns restaurant recommendations based on user profile goal/preferences.
-    Uses lat/lng coordinates to refine search location if provided.
-    Falls back to curated list if Supabase or Naver API is unavailable.
+    Uses LLM (o3-mini) to generate a search query and personalized advice.
+    """
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if not openai_key:
+        return {"query": "맛집", "advice": "오늘의 추천 맛집입니다."}
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=openai_key)
+        
+        # Build context
+        name = profile.get("name", "사용자") if profile else "사용자"
+        goal = profile.get("goal", "balanced") if profile else "balanced"
+        recent_meals_sum = sum(m.get("calories", 0) for m in meals)
+        target_cal = profile.get("target_calories", 2000) if profile else 2000
+        remaining_cal = max(0, target_cal - recent_meals_sum)
+        
+        prompt = (
+            f"사용자: {name}\n"
+            f"목표: {goal}\n"
+            f"오늘 남은 칼로리: {remaining_cal}kcal\n"
+            f"현재 날씨: {weather}\n"
+            f"현재 시간: {hour}시\n"
+            f"최근 식사 내역: {[m.get('food_name') for m in meals]}\n\n"
+            "위 정보를 바탕으로 네이버 로컬 API에 검색할 2-3단어의 최적 검색어(예: '고단백 샐러드', '따뜻한 국밥')와 "
+            "사용자에게 줄 다정하고 짧은 식사 어드바이스(30자 이내)를 JSON 형식으로 생성해줘. "
+            "형식: {\"query\": \"...\", \"advice\": \"...\"}"
+        )
+
+        completion = client.chat.completions.create(
+            model="o3-mini",
+            reasoning_effort="low", # Fast response for search
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"}
+        )
+        
+        import json
+        return json.loads(completion.choices[0].message.content)
+    except Exception as e:
+        print(f"LLM query generation error: {e}")
+        return {"query": "맛집", "advice": "사용자 맞춤형 추천입니다."}
+
+@router.get("/{user_id}", response_model=List[RestaurantRecommendation])
+async def get_recommendations(
+    user_id: str, 
+    lat: Optional[float] = None, 
+    lng: Optional[float] = None,
+    weather: Optional[str] = "맑음",
+    hour: Optional[int] = None
+):
+    """
+    Returns restaurant recommendations based on user profile, location, weather, and time.
+    Uses LLM to dynamically generate search terms.
     """
     profile = get_user_profile_from_supabase(user_id)
-
-    # Build Naver search query from profile preferences and location
-    query_parts = []
     
-    # Add location context if coordinates are provided
-    # Note: In a real app, we might use reverse geocoding to get "역삼동" etc.
-    # For now, we'll prefix with a generic "주변" or "내 위치 주변" 
-    # and rely on Naver's ability to handle context if we had a more advanced API,
-    # but with Naver Search API, we usually need the region name. 
-    # Let's assume the frontend might eventually pass a region name, 
-    # or for this demo, we use the coordinates to infer "주변".
-    
-    if profile:
-        goal = profile.get("goal", "balanced")
-        preferred = profile.get("preferred_categories", [])
-        if goal == "lose":
-            query_parts.append("샐러드 건강 식당")
-        elif goal == "gain":
-            query_parts.append("단백질 닭가슴살 식당")
-        elif preferred:
-            query_parts.append(f"{preferred[0]} 맛집")
-        else:
-            query_parts.append("건강 맛집")
-    else:
-        query_parts.append("건강 맛집")
+    # Fetch recent meals for today to give LLM context
+    today = datetime.now().strftime("%Y-%m-%d")
+    from api.endpoints.meals import get_meals
+    try:
+        recent_meals = await get_meals(user_id=user_id, date=today)
+        meals_data = [m.dict() for m in recent_meals]
+    except:
+        meals_data = []
 
-    # If coordinates are provided, Naver Search API doesn't take lat/lng directly.
-    # We would typically use a Geocoding API here. 
-    # As a workaround for this task, we'll just keep the query as is, 
-    # but the API structure is now ready to receive location data.
+    current_hour = hour if hour is not None else datetime.now().hour
     
-    query = " ".join(query_parts)
-    if not profile and not lat:
-        query = "강남 " + query
+    # Get LLM-powered query and advice
+    llm_result = await generate_personalized_query_and_reasons(
+        user_id, profile, meals_data, weather, current_hour
+    )
+    
+    query_text = llm_result.get("query", "맛집")
+    personal_advice = llm_result.get("advice", "오늘의 건강한 선택을 도와드릴게요.")
 
+    # Location Context
+    location_prefix = "주변 " if lat and lng else "강남 "
+    query = f"{location_prefix}{query_text}"
+    
     naver_items = await search_naver_local(query)
 
     if naver_items:
         results = []
+        history_to_insert = []
+        
         for i, item in enumerate(naver_items):
             name = item.get("title", "").replace("<b>", "").replace("</b>", "")
             address = item.get("roadAddress") or item.get("address", "")
@@ -181,7 +227,7 @@ async def get_recommendations(user_id: str, lat: Optional[float] = None, lng: Op
             category = item.get("category", "음식점")
             base = DEFAULT_RECOMMENDATIONS[i % len(DEFAULT_RECOMMENDATIONS)]
 
-            results.append(RestaurantRecommendation(
+            recommendation = RestaurantRecommendation(
                 id=str(i + 1),
                 name=name or base["name"],
                 category=category or base["category"],
@@ -194,12 +240,32 @@ async def get_recommendations(user_id: str, lat: Optional[float] = None, lng: Op
                 deliveryTime=base["deliveryTime"],
                 naverLink=naver_link,
                 imageUrl=base["imageUrl"],
-                reason=base["reason"],
+                reason=personal_advice, # Use LLM advice here
                 protein=base["protein"],
                 carbs=base["carbs"],
                 fat=base["fat"],
                 address=address or base["address"],
-            ))
+            )
+            results.append(recommendation)
+            
+            # Prepare for DB insert
+            history_to_insert.append({
+                "user_id": user_id,
+                "restaurant_name": recommendation.name,
+                "category": recommendation.category,
+                "signature_menu": recommendation.signature,
+                "calories": float(recommendation.signatureCalories),
+                "reason": recommendation.reason,
+            })
+
+        # Async-like save to Supabase (best effort)
+        try:
+            from db.supabase_client import get_supabase_client
+            supabase = get_supabase_client()
+            supabase.table("recommendation_history").insert(history_to_insert).execute()
+        except Exception as e:
+            print(f"Failed to log recommendations: {e}")
+
         return results
 
     return [RestaurantRecommendation(**r) for r in DEFAULT_RECOMMENDATIONS]

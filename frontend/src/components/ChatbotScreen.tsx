@@ -39,7 +39,7 @@ export function ChatbotScreen({ userProfile }: ChatbotScreenProps) {
 
   const loadChatHistory = async () => {
     try {
-      const history = await chatService.getHistory(userProfile.userId);
+      const history = await chatService.getHistory(userProfile.user_id);
       if (history && history.length > 0) {
         setMessages(history);
       } else {
@@ -75,11 +75,11 @@ export function ChatbotScreen({ userProfile }: ChatbotScreenProps) {
       const profileForRequest: Record<string, unknown> = {
         name: userProfile.name,
         goal: userProfile.goal,
-        targetCalories: userProfile.targetCalories,
-        currentCalories: userProfile.currentCalories,
+        target_calories: userProfile.target_calories,
+        current_calories: userProfile.current_calories,
         weight: userProfile.weight,
       };
-      const result = await chatService.sendMessage(userProfile.userId, userMessage, profileForRequest);
+      const result = await chatService.sendMessage(userProfile.user_id, userMessage, profileForRequest);
       setMessages(prev => [...prev, result.message]);
     } catch (error) {
       console.error('Error sending message:', error);
@@ -127,8 +127,8 @@ export function ChatbotScreen({ userProfile }: ChatbotScreenProps) {
           >
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-3 ${message.role === 'user'
-                  ? 'bg-green-600 text-white rounded-br-sm'
-                  : 'bg-white text-gray-900 rounded-bl-sm shadow-sm'
+                ? 'bg-green-600 text-white rounded-br-sm'
+                : 'bg-white text-gray-900 rounded-bl-sm shadow-sm'
                 }`}
             >
               {message.role === 'assistant' && (
