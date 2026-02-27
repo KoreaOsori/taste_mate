@@ -121,4 +121,11 @@ export const chatService = {
     },
 };
 
+export const authService = {
+    checkUser: async (email: string) => {
+        const response = await apiClient.post<{ exists: boolean }>('/auth/check-user', { email });
+        return response.data;
+    },
+};
+
 export default apiClient;

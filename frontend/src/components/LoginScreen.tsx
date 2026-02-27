@@ -5,6 +5,7 @@ import { Label } from './ui/label';
 import { ArrowRight, Loader2, UserCircle } from 'lucide-react';
 import logoImage from 'figma:asset/df871c26aa10ae23c0ba14499a1666fccdfbb972.png';
 import { supabase } from '../utils/supabaseClient';
+import { authService } from '../api/apiClient';
 
 interface LoginScreenProps {
   onLoginSuccess: (userId: string) => void;
@@ -37,7 +38,23 @@ export function LoginScreen({ onLoginSuccess, onSignupClick, onGuestLogin }: Log
       });
 
       if (authError) {
-        setError(authError.message);
+        if (authError.message === 'Invalid login credentials') {
+          // 보안상 Supabase는 구분하지 않으므로 백엔드 API로 추가 확인
+          try {
+            const { exists } = await authService.checkUser(formData.email);
+            if (exists) {
+              setError('비밀번호가 틀렸습니다');
+            } else {
+              setError('회원 정보가 존재하지 않습니다');
+            }
+          } catch (checkErr) {
+            setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+          }
+        } else if (authError.message === 'Email not confirmed') {
+          setError('이메일 인증이 필요합니다. 메일함을 확인해주세요.');
+        } else {
+          setError('로그인에 실패했습니다. 다시 시도해주세요.');
+        }
         return;
       }
 

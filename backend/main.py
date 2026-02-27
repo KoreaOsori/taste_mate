@@ -15,8 +15,11 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://localhost:5173", # Standard Vite port
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:8000",
     ],
     allow_credentials=True,
     allow_methods=["*"],

@@ -77,47 +77,40 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
   const carbsPercentage = Math.min((todayCarbs / targetCarbs) * 100, 100);
   const fatPercentage = Math.min((todayFat / targetFat) * 100, 100);
 
-  // Calculate weekly achievement rate (mock data for now)
-  const weeklyAchievementRate = 85; // This would come from actual data
-
-  // Get user's preferred cuisine based on meal history (mock data)
-  const getPreferredCuisine = () => {
-    const cuisines = ['korean', 'japanese', 'chinese', 'western', 'fusion'];
-    return cuisines[Math.floor(Math.random() * cuisines.length)];
+  // Calculate weekly achievement rate (using goal and meals)
+  const calculateWeeklyRate = () => {
+    if (todaysMeals.length === 0) return 0;
+    const rate = (todayCalories / userProfile.target_calories) * 100;
+    return Math.min(Math.round(rate), 100);
   };
 
-  const preferredCuisine = getPreferredCuisine();
+  const weeklyAchievementRate = calculateWeeklyRate();
 
-  // Character evolution based on cuisine preference
+  // Get user's actual preferred cuisine from profile
+  const preferredCuisine = userProfile.preferred_categories?.[0] || 'korean';
+
+  // Character evolution based on profile categories
   const getCharacterByCuisine = (cuisine: string) => {
-    switch (cuisine) {
-      case 'korean':
-        return { emoji: '🍚', type: '한식 마스터', icon: '🥢' };
-      case 'japanese':
-        return { emoji: '🍱', type: '일식 러버', icon: '🍣' };
-      case 'chinese':
-        return { emoji: '🍜', type: '중식 매니아', icon: '🥟' };
-      case 'western':
-        return { emoji: '🍝', type: '양식 전문가', icon: '🍕' };
-      case 'fusion':
-        return { emoji: '🍲', type: '퓨전 마스터', icon: '🌮' };
-      default:
-        return { emoji: '🍚', type: '밥친구', icon: '🍽️' };
-    }
+    const cuisineMap: Record<string, { emoji: string; type: string; icon: string }> = {
+      'korean': { emoji: '🍚', type: '한식 마스터', icon: '🥢' },
+      'japanese': { emoji: '🍱', type: '일식 러버', icon: '🍣' },
+      'chinese': { emoji: '🍜', type: '중식 매니아', icon: '🥟' },
+      'western': { emoji: '🍝', type: '양식 전문가', icon: '🍕' },
+      'asian': { emoji: '🍲', type: '아시안 마스터', icon: '🍜' },
+    };
+    return cuisineMap[cuisine] || { emoji: '🍚', type: '성장하는 미식가', icon: '🍽️' };
   };
 
-  // Character emotion based on weekly achievement
+  // Character emotion based on daily achievement (using profile target)
   const getCharacterEmotion = (rate: number) => {
-    if (rate >= 90) {
-      return { emoji: '🥳', mood: '최고예요!', color: 'from-yellow-400 to-orange-400' };
-    } else if (rate >= 70) {
-      return { emoji: '😊', mood: '좋아요!', color: 'from-green-400 to-emerald-400' };
-    } else if (rate >= 50) {
-      return { emoji: '😌', mood: '괜찮아요', color: 'from-blue-400 to-cyan-400' };
-    } else if (rate >= 30) {
-      return { emoji: '😐', mood: '조금 더!', color: 'from-gray-400 to-slate-400' };
+    if (rate >= 80 && rate <= 110) {
+      return { emoji: '🥳', mood: '목표 달성!', color: 'from-green-400 to-emerald-400' };
+    } else if (rate > 110) {
+      return { emoji: '😵', mood: '과식 주의!', color: 'from-orange-400 to-red-400' };
+    } else if (rate >= 40) {
+      return { emoji: '😊', mood: '잘하고 있어요!', color: 'from-blue-400 to-cyan-400' };
     } else {
-      return { emoji: '😴', mood: '힘내요!', color: 'from-purple-300 to-pink-300' };
+      return { emoji: '😴', mood: '조금 더 채워봐요', color: 'from-gray-300 to-slate-300' };
     }
   };
 

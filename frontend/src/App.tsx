@@ -114,29 +114,57 @@ export default function App() {
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
+    if (!userId) return;
+
     setAuthUserId(userId);
     setIsLoading(true);
     try {
+      console.log('Fetching profile for user:', userId);
       const profile = await profileService.getProfile(userId);
-      if (profile) {
+
+      if (profile && profile.user_id) {
+        console.log('Profile found, navigating to home');
         setUserProfile(profile as unknown as UserProfile);
         setCurrentScreen('home');
       } else {
-        // If logged in but no profile, send to onboarding
+        console.log('Profile response empty, navigating to onboarding');
         setCurrentScreen('location');
       }
     } catch (error: any) {
       console.error('Error fetching profile:', error);
-      if (error.response && error.response.status === 404) {
-        // If profile doesn't exist, start onboarding
-        setCurrentScreen('location');
+
+      // Axios 에러 처리
+      if (error.response) {
+        if (error.response.status === 404) {
+          // 서버에 데이터가 없는 경우만 온보딩으로 이동
+          console.log('Profile not found (404), starting onboarding');
+          setCurrentScreen('location');
+        } else {
+          // 기타 서버 에러 (500 등) - 다시 로그인 시도 유도
+          alert(`서버 응답 오류 (${error.response.status}). 다시 로그인해 주세요.`);
+          handleLogout();
+        }
+      } else if (error.request) {
+        // 네트워크 에러 (CORS, 서버 다운 등)
+        alert('백엔드 서버(FastAPI)와 통신할 수 없습니다. \n\n1. 백엔드 서버가 port 8000에서 실행 중인지 확인해 주세요.\n2. 서버가 실행 중이라면 터미널에서 오류 메시지가 없는지 확인해 주세요.');
+        handleLogout();
       } else {
-        // For other errors, maybe show login again or guest mode
+        // 기타 설정 오류
         setCurrentScreen('login');
       }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('tastemate_userId');
+    setUserProfile(null);
+    setSignupData(null);
+    setUserLocation(null);
+    setAuthUserId(null);
+    setCurrentScreen('login');
   };
 
   const handleSignupComplete = (userId: string, email: string, name: string) => {
@@ -228,14 +256,24 @@ export default function App() {
           />
         )}
         {currentScreen === 'location' && (
-          <LocationPermissionScreen onComplete={handleLocationComplete} />
+          <div className="flex flex-col min-h-screen">
+            <div className="p-4 flex justify-end">
+              <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-500 underline">로그아웃</button>
+            </div>
+            <LocationPermissionScreen onComplete={handleLocationComplete} />
+          </div>
         )}
         {currentScreen === 'onboarding' && (
-          <OnboardingScreenNew
-            onComplete={handleOnboardingComplete}
-            userId={authUserId || userProfile?.user_id || signupData?.userId || ''}
-            userName={userProfile?.name || signupData?.name}
-          />
+          <div className="flex flex-col min-h-screen">
+            <div className="px-6 pt-4 flex justify-end">
+              <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-red-500 underline">로그아웃</button>
+            </div>
+            <OnboardingScreenNew
+              onComplete={handleOnboardingComplete}
+              userId={authUserId || userProfile?.user_id || signupData?.userId || ''}
+              userName={userProfile?.name || signupData?.name}
+            />
+          </div>
         )}
         {currentScreen === 'home' && userProfile && (
           <DashboardHome
@@ -280,14 +318,7 @@ export default function App() {
           <ProfileScreen
             userProfile={userProfile}
             setUserProfile={setUserProfile}
-            onLogout={async () => {
-              await supabase.auth.signOut();
-              localStorage.removeItem('tastemate_userId');
-              setUserProfile(null);
-              setSignupData(null);
-              setUserLocation(null);
-              setCurrentScreen('login');
-            }}
+            onLogout={handleLogout}
           />
         )}
       </div>

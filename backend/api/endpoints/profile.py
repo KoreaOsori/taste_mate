@@ -32,11 +32,16 @@ async def get_profile(user_id: UUID4):
     """
     Fetch user profile from Supabase.
     """
-    response = supabase.table("profiles").select("*").eq("user_id", str(user_id)).execute()
+    user_id_str = str(user_id)
+    print(f"[DEBUG] Fetching profile for user_id: {user_id_str}")
     
-    if not response.data:
+    response = supabase.table("profiles").select("*").eq("user_id", user_id_str).execute()
+    
+    if not response.data or len(response.data) == 0:
+        print(f"[DEBUG] Profile not found for user_id: {user_id_str}")
         raise HTTPException(status_code=404, detail="Profile not found")
     
+    print(f"[DEBUG] Profile found: {response.data[0]['name']}")
     return response.data[0]
 
 @router.put("/{user_id}", response_model=UserProfile)

@@ -68,7 +68,13 @@ export function SignupScreen({ onComplete, onLoginClick }: SignupScreenProps) {
       });
 
       if (error) {
-        setErrors(prev => ({ ...prev, auth: error.message }));
+        if (error.message.includes('User already registered')) {
+          setErrors(prev => ({ ...prev, auth: '이미 가입된 이메일입니다.' }));
+        } else if (error.message.includes('Password should be at least 6 characters')) {
+          setErrors(prev => ({ ...prev, auth: '비밀번호는 최소 6자 이상이어야 합니다.' }));
+        } else {
+          setErrors(prev => ({ ...prev, auth: '회원가입에 실패했습니다. 입력 정보를 확인해주세요.' }));
+        }
         return;
       }
 
