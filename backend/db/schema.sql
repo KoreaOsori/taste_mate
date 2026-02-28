@@ -38,10 +38,43 @@ CREATE TABLE IF NOT EXISTS profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Food Metadata table
+CREATE TABLE IF NOT EXISTS foods (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT UNIQUE NOT NULL,
+    category TEXT,
+    sub_category TEXT,
+    cook_method TEXT,
+    main_ingredient TEXT[],
+    season TEXT[],
+    pref_gender TEXT,
+    pref_age TEXT[],
+    pref_weather TEXT[],
+    consumption_region TEXT[],
+    temperature TEXT,
+    texture TEXT[],
+    taste JSONB,
+    kcal_100g FLOAT,
+    macros_per_100g JSONB,
+    calories FLOAT, -- Legacy compatibility
+    protein FLOAT,
+    carbs FLOAT,
+    fat FLOAT,
+    weather TEXT,
+    time TEXT,
+    emotion TEXT,
+    spicy_level INTEGER,
+    popularity FLOAT DEFAULT 0,
+    tags TEXT[],
+    vector_embedding vector(1536),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Meal Records table
 CREATE TABLE IF NOT EXISTS meals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES profiles(user_id) ON DELETE CASCADE,
+    food_id UUID REFERENCES foods(id) ON DELETE SET NULL, -- Linked to foods
     type meal_type NOT NULL,
     food_name TEXT NOT NULL,
     calories FLOAT,
@@ -65,6 +98,7 @@ CREATE TABLE IF NOT EXISTS chat_history (
 CREATE TABLE IF NOT EXISTS recommendation_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES profiles(user_id) ON DELETE CASCADE,
+    food_id UUID REFERENCES foods(id) ON DELETE SET NULL, -- Linked to foods
     restaurant_name TEXT NOT NULL,
     category TEXT,
     signature_menu TEXT,
@@ -85,13 +119,3 @@ CREATE TABLE IF NOT EXISTS community_posts (
     likes INTEGER DEFAULT 0,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
--- Vector Database Metadata (Optional for later RAG)
--- CREATE EXTENSION IF NOT EXISTS vector;
--- CREATE TABLE IF NOT EXISTS menu_embeddings (
---     id BIGSERIAL PRIMARY KEY,
---     menu_name TEXT,
---     restaurant_name TEXT,
---     embedding VECTOR(1536),
---     metadata JSONB
--- );
