@@ -152,6 +152,7 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
   };
 
   const generateRecommendations = async (isQuick: boolean) => {
+    setQuestionStep('loading');
     try {
       const currentHour = new Date().getHours();
       const weather = weatherData?.condition || '맑음';
