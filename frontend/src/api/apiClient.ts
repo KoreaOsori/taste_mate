@@ -99,9 +99,9 @@ export const profileService = {
 };
 
 export const recommendService = {
-    getRecommendations: async (userId: string, lat?: number, lng?: number, weather?: string, hour?: number) => {
+    getRecommendations: async (userId: string, lat?: number, lng?: number, weather?: string, hour?: number, emotion?: string, companion?: string, preference?: string, budget?: string) => {
         const response = await apiClient.get<Restaurant[]>(`/recommend/${userId}`, {
-            params: { lat, lng, weather, hour },
+            params: { lat, lng, weather, hour, emotion, companion, preference, budget },
         });
         return response.data;
     },

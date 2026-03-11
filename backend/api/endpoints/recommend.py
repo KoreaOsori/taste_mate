@@ -168,55 +168,78 @@ def get_user_profile_from_supabase(user_id: str) -> Optional[dict]:
     return None
 
 
+def get_foods_v2_candidates() -> List[dict]:
+    """Fetch all active food candidates from foods_v2."""
+    try:
+        from db.supabase_client import get_supabase_client
+        supabase = get_supabase_client()
+        response = supabase.table("foods_v2").select("*").eq("is_active", True).execute()
+        return response.data or []
+    except Exception as e:
+        print(f"Error fetching foods_v2: {e}")
+        return []
+
 async def generate_personalized_query_and_reasons(
     user_id: str,
     profile: Optional[dict],
     meals: List[dict],
     weather: str,
-    hour: int
+    hour: int,
+    top_candidates: List[dict],
+    user_qna: dict
 ) -> dict:
     """
-    Uses LLM (o3-mini) to generate a search query and personalized advice.
+    Uses LLM (gpt-4o-mini) to generate a search query and personalized advice based on top ranked foods.
     """
     openai_key = os.environ.get("OPENAI_API_KEY")
     if not openai_key:
-        return {"query": "맛집", "advice": "오늘의 추천 맛집입니다."}
+        return {"query": top_candidates[0]['name'] if top_candidates else "맛집", "advice": "오늘의 추천 맛집입니다.", "candidates": top_candidates}
 
     try:
         from openai import OpenAI
         client = OpenAI(api_key=openai_key)
         
-        # Build context
         name = profile.get("name", "사용자") if profile else "사용자"
         goal = profile.get("goal", "balanced") if profile else "balanced"
         recent_meals_sum = sum(m.get("calories", 0) for m in meals)
         target_cal = profile.get("target_calories", 2000) if profile else 2000
         remaining_cal = max(0, target_cal - recent_meals_sum)
         
+        candidates_info = "\n".join([f"- {c['name']} (칼로리: {c['calories']}kcal, 단백질: {c['protein']}g, 특징: {c.get('taste', '')} {c.get('meal_heaviness', '')})" for c in top_candidates])
+        
         prompt = (
-            f"사용자: {name}\n"
-            f"목표: {goal}\n"
+            f"사용자 이름: {name}\n"
+            f"다이어트 목표: {goal}\n"
             f"오늘 남은 칼로리: {remaining_cal}kcal\n"
-            f"현재 날씨: {weather}\n"
-            f"현재 시간: {hour}시\n"
-            f"최근 식사 내역: {[m.get('food_name') for m in meals]}\n\n"
-            "위 정보를 바탕으로 네이버 로컬 API에 검색할 2-3단어의 최적 검색어(예: '고단백 샐러드', '따뜻한 국밥')와 "
-            "사용자에게 줄 다정하고 짧은 식사 어드바이스(30자 이내)를 JSON 형식으로 생성해줘. "
-            "형식: {\"query\": \"...\", \"advice\": \"...\"}"
+            f"현재 날씨: {weather}, 현재 시간: {hour}시\n"
+            f"사용자 기분: {user_qna.get('emotion', '응답없음')}, 동행: {user_qna.get('companion', '응답없음')}, 취향: {user_qna.get('preference', '응답없음')}, 예산: {user_qna.get('budget', '응답없음')}\n\n"
+            f"추천 시스템이 선정한 최적의 메뉴 후보 리스트:\n{candidates_info}\n\n"
+            "목표: 위 후보 메뉴들 중 사용자의 상황(칼로리, 기분, 취향 등)에 가장 잘 맞는 1~3개의 메뉴를 선택하고, 네이버 맛집 검색을 위한 최적의 '검색어(query)'와 50자 이내의 다정하고 '정량적인 조언(advice)'을 작성해주세요. 조언에는 왜 이 메뉴가 추천되었는지(예: 남은 칼로리, 단백질 함량 등)가 수치와 함께 포함되어야 합니다.\n"
+            "형식: JSON 응답. {\"query\": \"선택된메뉴이름 주변맛집\", \"advice\": \"...\", \"selected_food_names\": [\"메뉴1\", \"메뉴2\"]}"
         )
 
         completion = client.chat.completions.create(
-            model="o3-mini",
-            reasoning_effort="low", # Fast response for search
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
         
         import json
-        return json.loads(completion.choices[0].message.content)
+        result = json.loads(completion.choices[0].message.content)
+        # Attach the original candidate data back to the result
+        selected_names = result.get("selected_food_names", [])
+        selected_candidates = [c for c in top_candidates if c['name'] in selected_names]
+        
+        # Fallback if LLM didn't match exactly
+        if not selected_candidates:
+            selected_candidates = top_candidates[:3]
+            
+        result['candidates'] = selected_candidates
+        return result
+        
     except Exception as e:
-        print(f"LLM query generation error: {e}")
-        return {"query": "맛집", "advice": "사용자 맞춤형 추천입니다."}
+        print(f"LLM generation error: {e}")
+        return {"query": top_candidates[0]['name'] if top_candidates else "맛집", "advice": "사용자 맞춤형 추천입니다.", "candidates": top_candidates[:3]}
 
 @router.get("/address", response_model=dict)
 async def get_current_address(lat: float, lng: float):
@@ -230,15 +253,14 @@ async def get_recommendations(
     lat: Optional[float] = None, 
     lng: Optional[float] = None,
     weather: Optional[str] = "맑음",
-    hour: Optional[int] = None
+    hour: Optional[int] = None,
+    emotion: Optional[str] = None,
+    companion: Optional[str] = None,
+    preference: Optional[str] = None,
+    budget: Optional[str] = None
 ):
-    """
-    Returns restaurant recommendations based on user profile, location, weather, and time.
-    Uses LLM to dynamically generate search terms.
-    """
     profile = get_user_profile_from_supabase(user_id)
     
-    # Fetch recent meals for today to give LLM context
     today = datetime.now().strftime("%Y-%m-%d")
     from api.endpoints.meals import get_meals
     try:
@@ -249,15 +271,42 @@ async def get_recommendations(
 
     current_hour = hour if hour is not None else datetime.now().hour
     
-    # Get LLM-powered query and advice
+    # 1. Evaluate User Features for Ranker
+    target_cal = profile.get("target_calories", 2000) if profile else 2000
+    consumed_cal = sum(m.get("calories", 0) for m in meals_data)
+    
+    user_features = {
+        'target_calories': target_cal,
+        'consumed_calories': consumed_cal,
+        'hour': current_hour,
+        'weather': weather,
+        'emotion': emotion,
+        'companion': companion,
+        'preference': preference,
+        'budget': budget
+    }
+    
+    # 2. Fetch all candidates & Rank
+    all_candidates = get_foods_v2_candidates()
+    if all_candidates:
+        from models.ranker import RecommendationRanker
+        ranker = RecommendationRanker()
+        ranked_candidates = ranker.score_candidates(all_candidates, user_features)
+        top_candidates = ranked_candidates[:10]  # Pass top 10 to LLM
+    else:
+        top_candidates = []
+
+    # 3. LLM Logic
+    user_qna = {'emotion': emotion, 'companion': companion, 'preference': preference, 'budget': budget}
     llm_result = await generate_personalized_query_and_reasons(
-        user_id, profile, meals_data, weather, current_hour
+        user_id, profile, meals_data, weather, current_hour, top_candidates, user_qna
     )
     
     query_text = llm_result.get("query", "맛집")
     personal_advice = llm_result.get("advice", "오늘의 건강한 선택을 도와드릴게요.")
+    selected_foods = llm_result.get("candidates", [])
 
-    # Location Context: Use provided coordinates, or fallback to profile location, or Gangnam
+    # 4. Location Context & Naver API Search
     actual_lat = lat if lat is not None else DEFAULT_LAT
     actual_lng = lng if lng is not None else DEFAULT_LNG
     
@@ -269,42 +318,45 @@ async def get_recommendations(
             location_prefix = f"{DEFAULT_LOCATION_NAME} "
     
     query = f"{location_prefix}{query_text}"
-    
     naver_items = await search_naver_local(query)
 
-    if naver_items:
+    if naver_items and selected_foods:
         results = []
         history_to_insert = []
         
         for i, item in enumerate(naver_items):
+            if i >= 3: # Limit to top 3 for UI consistency
+                break
+                
             name = item.get("title", "").replace("<b>", "").replace("</b>", "")
             address = item.get("roadAddress") or item.get("address", "")
             naver_link = item.get("link", "https://map.naver.com")
-            category = item.get("category", "음식점")
+            
+            # Map selected_foods to restaurants (round-robin if fewer foods than restaurants)
+            food = selected_foods[i % len(selected_foods)]
             base = DEFAULT_RECOMMENDATIONS[i % len(DEFAULT_RECOMMENDATIONS)]
 
             recommendation = RestaurantRecommendation(
                 id=str(i + 1),
                 name=name or base["name"],
-                category=category or base["category"],
+                category=food.get("category", base["category"]),
                 distance=base["distance"],
                 rating=float(item.get("rating", base["rating"] * 10) or base["rating"] * 10) / 10,
                 reviewCount=base["reviewCount"],
-                signature=base["signature"],
-                signatureCalories=base["signatureCalories"],
-                price=base["price"],
+                signature=food.get("name", base["signature"]),
+                signatureCalories=int(food.get("calories", base["signatureCalories"])),
+                price=f"{int(food.get('price_per_serving', 10000))}원",
                 deliveryTime=base["deliveryTime"],
                 naverLink=naver_link,
-                imageUrl=base["imageUrl"],
-                reason=personal_advice, # Use LLM advice here
-                protein=base["protein"],
-                carbs=base["carbs"],
-                fat=base["fat"],
+                imageUrl=base["imageUrl"],  # Would ideally come from foods_v2 or Naver image search
+                reason=personal_advice,
+                protein=float(food.get("protein", base["protein"])),
+                carbs=float(food.get("carbs", base["carbs"])),
+                fat=float(food.get("fat", base["fat"])),
                 address=address or base["address"],
             )
             results.append(recommendation)
             
-            # Prepare for DB insert
             history_to_insert.append({
                 "user_id": user_id,
                 "restaurant_name": recommendation.name,
@@ -314,7 +366,6 @@ async def get_recommendations(
                 "reason": recommendation.reason,
             })
 
-        # Async-like save to Supabase (best effort)
         try:
             from db.supabase_client import get_supabase_client
             supabase = get_supabase_client()

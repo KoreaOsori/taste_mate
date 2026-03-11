@@ -162,7 +162,11 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
         userLocationData?.lat || DEFAULT_LAT,
         userLocationData?.lng || DEFAULT_LNG,
         weather,
-        currentHour
+        currentHour,
+        isQuick ? undefined : selectedEmotion,
+        isQuick ? undefined : selectedCompanion,
+        isQuick ? undefined : selectedPreference,
+        isQuick ? undefined : selectedBudget
       );
 
       if (data && data.length > 0) {
