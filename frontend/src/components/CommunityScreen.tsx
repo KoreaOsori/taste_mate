@@ -61,7 +61,7 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
 
     const newPost: CommunityPost = {
       id: crypto.randomUUID(),
-      user_id: userProfile.user_id,
+      userId: userProfile.user_id,
       userName: userProfile.name,
       content: formData.content,
       calories: formData.calories ? parseInt(formData.calories) : undefined,
@@ -252,7 +252,7 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
                     id="location"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="서울 강남구"
+                    placeholder="예: 서울숲 맛집"
                   />
                 </div>
               </div>

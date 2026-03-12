@@ -200,7 +200,7 @@ export function RestaurantRecommendationScreen({ userProfile }: RestaurantRecomm
         <div className="px-6 py-3 bg-blue-50 border-b border-blue-100">
           <div className="flex items-center gap-2 text-sm text-blue-700">
             <MapPin className="w-4 h-4" />
-            <span>현재 위치: 서울시 강남구 역삼동</span>
+            <span>현재 위치: {userProfile.location || '위치 정보 확인 중...'}</span>
           </div>
         </div>
       )}
@@ -213,8 +213,8 @@ export function RestaurantRecommendationScreen({ userProfile }: RestaurantRecomm
               key={category}
               onClick={() => setFilterCategory(category)}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filterCategory === category
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
             >
               {category === 'all' ? '전체' : category}

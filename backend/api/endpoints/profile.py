@@ -23,6 +23,8 @@ class UserProfile(BaseModel):
     preferred_categories: List[str] = []
     disliked_foods: List[str] = []
     restricted_foods: List[str] = []
+    location: Optional[str] = None
+    location_consent: bool = False
 
 from db.supabase_client import get_supabase_client
 supabase = get_supabase_client()
@@ -49,13 +51,27 @@ async def update_profile(user_id: UUID4, profile: UserProfile):
     """
     Update or insert user profile in Supabase.
     """
-    profile_dict = profile.dict(exclude_none=True)
-    profile_dict["user_id"] = str(user_id)
-    
-    # Use upsert to handle both create and update
-    response = supabase.table("profiles").upsert(profile_dict).execute()
-    
-    if not response.data:
-        raise HTTPException(status_code=400, detail="Failed to update profile")
+    try:
+        profile_dict = profile.dict(exclude_none=True)
+        profile_dict["user_id"] = str(user_id)
         
-    return response.data[0]
+        print(f"[DEBUG] Updating profile for {user_id}: {profile_dict}")
+        
+        # Use upsert to handle both create and update
+        response = supabase.table("profiles").upsert(profile_dict).execute()
+        
+        if not response.data:
+            print(f"[ERROR] No data returned from Supabase: {response}")
+            raise HTTPException(status_code=400, detail="Failed to update profile - no data returned")
+            
+        return response.data[0]
+    except Exception as e:
+        print(f"[EXCEPTION] Error during profile update: {str(e)}")
+        # Check if it's a column missing error
+        error_msg = str(e)
+        if "column" in error_msg.lower() and "does not exist" in error_msg.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Database schema mismatch: {error_msg}. Please run columns update SQL."
+            )
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {error_msg}")

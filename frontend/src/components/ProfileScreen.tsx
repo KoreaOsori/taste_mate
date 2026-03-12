@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UserProfile } from '../App';
 import { User, Settings, Bell, Lock, HelpCircle, LogOut, ChevronRight, Edit2, MapPin, Globe, Shield } from 'lucide-react';
 import { Button } from './ui/button';
@@ -28,6 +28,24 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
   });
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [isLocationEnabled, setIsLocationEnabled] = useState(userProfile?.location_consent || false);
+
+  // userProfile이 변경될 때 (저장 성공 후 등) formData를 동기화
+  useEffect(() => {
+    if (userProfile) {
+      setFormData({
+        name: userProfile.name || '',
+        age: userProfile.age?.toString() || '',
+        height: userProfile.height?.toString() || '',
+        weight: userProfile.weight?.toString() || '',
+        target_weight: userProfile.target_weight?.toString() || '',
+        breakfast_time: userProfile.breakfast_time || '08:00',
+        lunch_time: userProfile.lunch_time || '12:00',
+        dinner_time: userProfile.dinner_time || '18:00',
+      });
+      setIsLocationEnabled(userProfile.location_consent || false);
+    }
+  }, [userProfile]);
+
 
   if (!userProfile) {
     return (

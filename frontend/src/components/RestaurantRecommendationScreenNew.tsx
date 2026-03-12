@@ -56,7 +56,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
     protein: 38,
     carbs: 75,
     fat: 22,
-    address: '서울시 강남구 역삼동 123-45',
+    address: '주변 위치 확인 중...',
   },
   {
     id: '2',
@@ -76,7 +76,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
     protein: 35,
     carbs: 15,
     fat: 12,
-    address: '서울시 강남구 역삼동 234-56',
+    address: '주변 위치 확인 중...',
   },
 ];
 

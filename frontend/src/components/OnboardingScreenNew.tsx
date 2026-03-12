@@ -44,7 +44,7 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
     dislikedFoods: '',
     healthGoal: 'balanced' as 'lose' | 'balanced' | 'gain',
     activityLevel: 'moderate' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active',
-    locationConsent: false,
+    locationConsent: true,
   });
 
   const toggleCategory = (categoryId: string) => {

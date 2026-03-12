@@ -1,80 +1,87 @@
-# 🍱 TasteMate (밥친구)
-> **AI 기반 맞춤형 식단 관리 및 맛집 추천 서비스**
+# 🍱 TasteMate (맛친구)
+> **AI & RAG 기반 초개인화 식단 관리 및 맛집 추천 솔루션**
 
-TasteMate는 사용자의 신체 정보, 식습관, 현재 위치를 결합하여 최적의 영양 분석과 맛집 추천을 제공하는 스마트 식단 가이드 애플리케이션입니다.
-
----
-
-## 🚀 주요 기능 (Core Features)
-
-### 1. 지능형 온보딩 (Smart Onboarding)
-*   사용자의 나이, 성별, 키, 체중, 활동량, 건강 목표 수집.
-*   Harris-Benedict 공식을 활용한 기초대사량(BMR) 및 일일 권장 칼로리(TDEE) 자동 계산.
-*   식사 취향(기호품/기피 음식) 및 식사 시간 설정.
-
-### 2. AI 영양 분석 및 대시보드
-*   일일 목표 칼로리 대비 실시간 섭취량 시각화.
-*   식사 기록(아침, 점심, 저녁, 간식)별 상세 영양소 추적.
-*   사용자 데이터 기반 맞춤형 건강 인사이트 제공.
-
-### 3. 맞춤형 맛집 추천
-*   사용자의 선호 카테고리 및 위치 기반 실시간 식당 추천.
-*   AI 챗봇을 통한 메뉴 결정 및 식단 고민 상담.
+TasteMate는 단순한 식단 기록을 넘어, 사용자의 **신체 정보, 영양 상태, 실시간 위치, 그리고 외부 환경(날씨/시간)**을 종합적으로 분석하여 최적의 메뉴를 결정해주는 "지능형 식사 가이드"입니다.
 
 ---
 
-## 🛠 기술 스택 (Tech Stack)
+## 🌟 핵심 가치 (Core Values)
 
-### **Frontend**
-*   **Framework**: React 18 (Vite)
-*   **UI/UX**: Tailwind CSS, Lucide Icons, Shadcn UI
-*   **State/API**: Axios, React Hooks
-
-### **Backend**
-*   **Framework**: FastAPI (Python 3.11)
-*   **Database/Auth**: Supabase (PostgreSQL)
-*   **AI Engine**: OpenAI GPT-4o / Google Gemini
-*   **Data Analysis**: Pandas, Scikit-learn (추천 엔진 로직)
+TasteMate는 현대인들의 "오늘 뭐 먹지?"라는 고민을 해결하기 위해 개발되었습니다. RAG(Retrieval-Augmented Generation) 기술과 정교한 랭킹 알고리즘을 통해, 단순 검색이 아닌 '나에게 가장 필요한 한 끼'를 제안합니다.
 
 ---
 
-## 🐳 개발 환경 및 실행 방법 (Docker)
+## 🚀 주요 기능 (Key Features)
 
-본 프로젝트는 서비스 간의 의존성 해결과 일관된 실행 환경을 위해 Docker를 사용합니다.
+### 1. 지능형 온보딩 및 신체 데이터 분석
+*   **정밀 계산**: Harris-Benedict 공식을 활용하여 기초대사량(BMR) 및 TDEE(일일 총 에너지 소비량)를 자동 산출합니다.
+*   **목표 관리**: 다이어트, 체중 유지, 벌크업 등 사용자의 목표에 따른 맞춤형 영양 가이드라인을 설정합니다.
 
-### 1. 사전 준비 (Pre-requisites)
-*   Docker 및 Docker Desktop 설치
-*   `backend/.env` 및 `frontend/.env` 파일 설정 완료
+### 2. 고도화된 추천 알고리즘 (Hybrid Re-ranker)
+*   **RAG 랭킹 모델**: 외부 식당 데이터와 벡터 DB를 결합하여 단순 카테고리 매칭을 넘어선 수학적 재정렬(Re-ranking)을 수행합니다.
+*   **컨텍스트 분석**: 현재 날씨, 시간대, 사용자의 감정 및 동행자 유무를 고려한 다차원 추천 엔진이 탑재되어 있습니다.
 
-### 2. 가동 방법
-터미널에서 프로젝트 루트 디렉토리로 이동한 후 아래 명령어를 입력합니다.
-```bash
-docker-compose up --build
-```
+### 3. 심리스한 사용자 경험 (UX Persistence)
+*   **상태 영속화**: 내비게이션 상태와 위치 정보를 로컬 저장소 및 DB에 동기화하여, 새로고침이나 탭 이동 시에도 끊김 없는 경험을 제공합니다.
+*   **실시간 위치 동기화**: Reverse Geocoding을 통해 사용자의 실시간 주소를 감지하고 프로필에 자동 반영합니다.
 
-### 3. 접속 정보
-*   **Frontend**: [http://localhost:3000](http://localhost:3000)
-*   **Backend API**: [http://localhost:8000](http://localhost:8000)
-*   **Backend Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+### 4. AI 챗봇 및 영양 리포트
+*   **대화형 인터페이스**: LLM 기반 챗봇이 식단 고민에 대해 전문가 수준의 피드백을 제공합니다.
+*   **시각화 리포트**: 캘린더 및 통계 대시보드를 통해 일일 탄/단/지 섭취 비중을 한눈에 파악할 수 있습니다.
 
 ---
 
-## 📂 프로젝트 구조 (Architecture)
+## 🛠 기술 스택 (Technical Architecture)
+
+### **Frontend Layer**
+- **Library**: `React 18` (Vite 기반 고속 빌드)
+- **Styling**: `Tailwind CSS` (Modern UI/UX)
+- **State Management**: `React Hooks` & `LocalStorage Persistence`
+- **Icons**: `Lucide React`
+
+### **Backend Layer**
+- **Framework**: `FastAPI` (High Performance Python Framework)
+- **Database**: `Supabase` (PostgreSQL 기반의 실시간 DB & Auth)
+- **AI/LLM**: `OpenAI GPT-4o-mini` (추천 로직 및 챗봇 엔진)
+- **Algorithm**: `Vector DB (RAG)` 연계형 랭킹 알고리즘
+
+---
+
+## 📂 프로젝트 구조 (Structure)
 
 ```text
 taste_mate/
-├── backend/            # FastAPI 백엔드 (API, 추천 엔진, DB 연동)
-├── frontend/           # React 프런트엔드 (Vite, UI 컴포넌트)
-├── docs/               # 상세 기술 및 요약 보고서 문서함
-│   ├── 05_Onboarding_Expansion_Report.md
-│   ├── 06_API_Integration_DB_Persistence_Report.md
-│   └── 07_Docker_Setup_Guide.md
+├── backend/            # FastAPI 기반 고성능 백엔드 API
+│   ├── api/            # 엔드포인트 및 라우터 (Profile, Recommend, Meals)
+│   ├── core/           # 시스템 설정 및 보안
+│   └── db/             # Supabase 연동 및 SQL 스키마
+├── frontend/           # React 기반 싱글 페이지 애플리케이션 (SPA)
+│   ├── src/components/ # 재사용 가능한 UI 컴포넌트
+│   └── src/api/        # API 클라이언트 모듈
+├── docs/               # 상세 개발 리포트 및 아키텍처 문서 (1~14번 보고서)
 └── docker-compose.yml  # 하이브리드 서비스 통합 관리 설정
 ```
 
 ---
 
-## 📄 라이선스 및 문서
-자세한 개발 내역은 `docs/` 폴더 내의 각 리포트를 참조하세요.
-*   [Docker 상세 가이드](docs/07_Docker_Setup_Guide.md)
-*   [API 연동 및 DB 영속화 리포트](docs/06_API_Integration_DB_Persistence_Report.md)
+## 🐳 개발 환경 및 실행 방법
+
+### 1. 환경 설정 (Environment Variables)
+- 프로젝트 루트의 `backend/.env`와 `frontend/.env`에 Supabase URL, API Key 등을 설정해야 합니다.
+
+### 2. Docker를 이용한 원클릭 실행
+터미널에서 아래 명령어를 실행하면 모든 환경이 자동으로 빌드 및 가동됩니다.
+```bash
+docker-compose up --build
+```
+
+### 3. 접속 정보
+- **Service Link**: [http://localhost:3000](http://localhost:3000)
+- **API Documentation (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+## 📄 문서 가이드 (Documentation)
+상세한 개발 여정 및 기술적 결정 사항은 `docs/` 폴더 내의 리포트를 참조하세요.
+- **[보고서 13]**: RAG 기반 추천 알고리즘 고도화 전략
+- **[보고서 14]**: UX 영속성 처리 및 프로필 관리 시스템 개선 내역

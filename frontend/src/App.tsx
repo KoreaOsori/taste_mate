@@ -78,10 +78,24 @@ export interface Comment {
 import { supabase } from './utils/supabaseClient';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    const saved = localStorage.getItem('tastemate_currentScreen');
+    if (saved) return saved as Screen;
+    return 'login';
+  });
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<Meal[]>([]);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(() => {
+    const saved = localStorage.getItem('tastemate_userLocation');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
   const [signupData, setSignupData] = useState<{ userId: string; email: string; name: string } | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,6 +128,13 @@ export default function App() {
     };
   }, []);
 
+  // currentScreen 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (currentScreen !== 'login' && currentScreen !== 'signup') {
+      localStorage.setItem('tastemate_currentScreen', currentScreen);
+    }
+  }, [currentScreen]);
+
   // location_consent 상태 변화 감지 및 위치 추적 트리거
   useEffect(() => {
     if (userProfile?.location_consent) {
@@ -127,13 +148,24 @@ export default function App() {
             };
             console.log('Location synchronized:', location);
             setUserLocation(location);
+            localStorage.setItem('tastemate_userLocation', JSON.stringify(location));
 
             // 주소 정보(Reverse Geocoding) 가져오기
             try {
               const addrResponse = await recommendService.getAddress(location.latitude, location.longitude);
               if (addrResponse && addrResponse.address) {
                 console.log('Real-time address acquired:', addrResponse.address);
+
+                // 로컬 상태 업데이트
                 setUserProfile(prev => prev ? { ...prev, location: addrResponse.address } : null);
+
+                // DB에 위치 정보 영구 저장 (프로필 동기화)
+                if (userProfile && userProfile.user_id !== 'guest') {
+                  const updatedProfile = { ...userProfile, location: addrResponse.address };
+                  profileService.updateProfile(userProfile.user_id, updatedProfile as any)
+                    .then(() => console.log('Location persisted to DB successfully'))
+                    .catch(err => console.error('Failed to persist location to DB:', err));
+                }
               }
             } catch (addrError) {
               console.warn('Failed to fetch address from coordinates:', addrError);
@@ -149,7 +181,8 @@ export default function App() {
       if (userLocation) {
         console.log('Location consent revoked, clearing location data.');
         setUserLocation(null);
-        setUserProfile(prev => prev ? { ...prev, location: '서울시 강남구' } : null);
+        localStorage.removeItem('tastemate_userLocation');
+        setUserProfile(prev => prev ? { ...prev, location: '' } : null);
       }
     }
   }, [userProfile?.location_consent]);
@@ -166,7 +199,14 @@ export default function App() {
       if (profile && profile.user_id) {
         console.log('Profile fetched successfully:', profile);
         setUserProfile(profile as unknown as UserProfile);
-        setCurrentScreen('home');
+
+        // 새로고침이나 재접속 시 기존 화면 유지, 없으면 홈으로
+        const savedScreen = localStorage.getItem('tastemate_currentScreen');
+        if (savedScreen && savedScreen !== 'login' && savedScreen !== 'signup' && savedScreen !== 'location' && savedScreen !== 'onboarding') {
+          setCurrentScreen(savedScreen as Screen);
+        } else {
+          setCurrentScreen('home');
+        }
       } else {
         console.log('Profile not found (empty), starting onboarding');
         setCurrentScreen('location');

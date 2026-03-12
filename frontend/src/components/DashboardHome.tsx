@@ -247,7 +247,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
           </div>
           <div className="flex items-center gap-1.5">
             <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-500">{userProfile.location || '서울시 강남구'}</span>
+            <span className="text-sm text-gray-500">{userProfile.location || '위치 정보 확인 중...'}</span>
           </div>
         </div>
       </div>
