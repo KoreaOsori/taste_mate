@@ -71,5 +71,12 @@
     server: {
       port: 3000,
       open: true,
+      // Docker 등에서 백엔드를 같은 출처로 프록시 (브라우저가 백엔드에 직접 접근하지 않음)
+      proxy: {
+        '/api': {
+          target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
+          changeOrigin: true,
+        },
+      },
     },
   });

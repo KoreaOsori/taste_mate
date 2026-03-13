@@ -24,5 +24,5 @@ COPY . .
 # 8000 포트 노출
 EXPOSE 8000
 
-# 앱 실행 (로컬 개발 환경처럼 uvicorn으로 실행)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Python entrypoint: 컨테이너 DNS를 8.8.8.8로 고정(Supabase 연결용). shell 스크립트 대신 사용해 Windows CRLF 문제 회피
+ENTRYPOINT ["python3", "/app/entrypoint.py"]

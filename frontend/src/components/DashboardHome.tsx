@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { UserProfile, Meal, Screen } from '../App';
-import { MapPin, Flame, Apple, Droplet, Zap, ChevronRight, Sparkles, TrendingUp, Trophy, Users } from 'lucide-react';
+import { MapPin, Flame, Apple, Droplet, Zap, ChevronRight, Sparkles, Users } from 'lucide-react';
 
 interface DashboardHomeProps {
   userProfile: UserProfile;
@@ -239,7 +239,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white pb-20">
-      {/* Simple Header - One Line */}
+      {/* 인사말 / 위치 */}
       <div className="px-6 pt-8 pb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -252,92 +252,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
         </div>
       </div>
 
-      {/* Community & Challenge Carousel - Enhanced readability */}
-      <div className="px-6 py-2">
-        <div className="relative h-40 overflow-hidden">
-          {currentCommunityItem ? (
-            <div
-              className="bg-white rounded-3xl shadow-xl p-8 border-3 border-gray-200 transition-all duration-500"
-              key={currentCommunityIndex}
-              onTouchStart={handleCommunityTouchStart}
-              onTouchMove={handleCommunityTouchMove}
-              onTouchEnd={handleCommunityTouchEnd}
-            >
-              <div className="flex items-start gap-5">
-                <div className="text-5xl">{currentCommunityItem.icon}</div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${currentCommunityItem.type === 'community'
-                      ? 'bg-red-100 text-red-600'
-                      : 'bg-purple-100 text-purple-600'
-                      }`}>
-                      {currentCommunityItem.badge}
-                    </span>
-                    {currentCommunityItem.type === 'community' && (
-                      <span className="text-sm font-medium text-gray-500">@{currentCommunityItem.author}</span>
-                    )}
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-xl mb-3">{currentCommunityItem.title}</h3>
-                  <div className="flex items-center gap-5 text-base font-semibold text-gray-700">
-                    {currentCommunityItem.type === 'community' ? (
-                      <>
-                        <span>❤️ {currentCommunityItem.likes}</span>
-                        <span>💬 {currentCommunityItem.comments}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>👥 {currentCommunityItem.participants}명 참여</span>
-                        <span>⏰ {currentCommunityItem.daysLeft}일 남음</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => onNavigate('community')}
-              className="w-full h-full bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl shadow-xl flex items-center justify-center gap-4 text-white hover:shadow-2xl transition-all"
-            >
-              <Users className="w-8 h-8" />
-              <span className="text-2xl font-bold">커뮤니티 / 챌린지 보러가기</span>
-              <ChevronRight className="w-8 h-8" />
-            </button>
-          )}
-        </div>
-
-        {/* Pagination Dots */}
-        <div className="flex items-center justify-center gap-2 mt-4">
-          {[...communityItems, null].map((_, index) => (
-            <div
-              key={index}
-              className={`h-2 rounded-full transition-all duration-300 ${index === currentCommunityIndex
-                ? 'w-8 bg-green-500'
-                : 'w-2 bg-gray-300'
-                }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Today's Habit Tip - Much larger text for better readability */}
-      <div className="px-6 py-4">
-        <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl shadow-xl p-10 text-white">
-          <div className="flex items-start gap-5">
-            <div className="w-20 h-20 bg-white/30 rounded-3xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm">
-              <Sparkles className="w-10 h-10" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-3xl font-bold mb-4">오늘의 식습관 조언</h2>
-              <p className="text-white text-xl leading-relaxed font-medium">
-                {getDietaryAdvice()}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Nutrition Details with Score - Better readability */}
+      {/* 오늘 식사/영양 요약 */}
       <div className="px-6 py-4">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-3xl font-bold text-gray-900">오늘의 영양소 섭취</h2>
@@ -418,6 +333,91 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 오늘의 식습관 조언 */}
+      <div className="px-6 py-4">
+        <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl shadow-xl p-10 text-white">
+          <div className="flex items-start gap-5">
+            <div className="w-20 h-20 bg-white/30 rounded-3xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm">
+              <Sparkles className="w-10 h-10" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-3xl font-bold mb-4">오늘의 식습관 조언</h2>
+              <p className="text-white text-xl leading-relaxed font-medium">
+                {getDietaryAdvice()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. 조언/팁/커뮤니티 - Community & Challenge Carousel */}
+      <div className="px-6 py-2">
+        <div className="relative h-40 overflow-hidden">
+          {currentCommunityItem ? (
+            <div
+              className="bg-white rounded-3xl shadow-xl p-8 border-3 border-gray-200 transition-all duration-500"
+              key={currentCommunityIndex}
+              onTouchStart={handleCommunityTouchStart}
+              onTouchMove={handleCommunityTouchMove}
+              onTouchEnd={handleCommunityTouchEnd}
+            >
+              <div className="flex items-start gap-5">
+                <div className="text-5xl">{currentCommunityItem.icon}</div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${currentCommunityItem.type === 'community'
+                      ? 'bg-red-100 text-red-600'
+                      : 'bg-purple-100 text-purple-600'
+                      }`}>
+                      {currentCommunityItem.badge}
+                    </span>
+                    {currentCommunityItem.type === 'community' && (
+                      <span className="text-sm font-medium text-gray-500">@{currentCommunityItem.author}</span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-xl mb-3">{currentCommunityItem.title}</h3>
+                  <div className="flex items-center gap-5 text-base font-semibold text-gray-700">
+                    {currentCommunityItem.type === 'community' ? (
+                      <>
+                        <span>❤️ {currentCommunityItem.likes}</span>
+                        <span>💬 {currentCommunityItem.comments}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>👥 {currentCommunityItem.participants}명 참여</span>
+                        <span>⏰ {currentCommunityItem.daysLeft}일 남음</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => onNavigate('community')}
+              className="w-full h-full bg-gradient-to-r from-green-500 to-emerald-600 rounded-3xl shadow-xl flex items-center justify-center gap-4 text-white hover:shadow-2xl transition-all"
+            >
+              <Users className="w-8 h-8" />
+              <span className="text-2xl font-bold">커뮤니티 / 챌린지 보러가기</span>
+              <ChevronRight className="w-8 h-8" />
+            </button>
+          )}
+        </div>
+
+        {/* Pagination Dots */}
+        <div className="flex items-center justify-center gap-2 mt-4">
+          {[...communityItems, null].map((_, index) => (
+            <div
+              key={index}
+              className={`h-2 rounded-full transition-all duration-300 ${index === currentCommunityIndex
+                ? 'w-8 bg-green-500'
+                : 'w-2 bg-gray-300'
+                }`}
+            />
+          ))}
         </div>
       </div>
 

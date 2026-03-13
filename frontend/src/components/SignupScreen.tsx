@@ -90,15 +90,15 @@ export function SignupScreen({ onComplete, onLoginClick }: SignupScreenProps) {
 
   const handleKakaoSignup = async () => {
     try {
+      // Supabase Redirect URLs에 이 주소가 등록되어 있어야 함. 문서: docs/11_Kakao_Login_Supabase_설정.md
+      const redirectTo = `${window.location.origin}${window.location.pathname || '/'}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'kakao',
-        options: {
-          redirectTo: window.location.origin
-        }
+        options: { redirectTo }
       });
       if (error) throw error;
     } catch (err: any) {
-      alert('카카오 로그인 중 오류가 발생했습니다: ' + err.message);
+      alert('카카오 로그인 중 오류가 발생했습니다: ' + (err?.message ?? '설정을 확인해 주세요.'));
     }
   };
 

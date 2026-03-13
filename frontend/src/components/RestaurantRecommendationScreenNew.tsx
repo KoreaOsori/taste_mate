@@ -8,6 +8,19 @@ import { FeedbackModal } from './FeedbackModal';
 import { RestaurantRecommendationCardView } from './RestaurantRecommendationCardView';
 import { recommendService } from '../api/apiClient';
 
+const FOOD_CATEGORIES = [
+  { id: 'korean', label: '한식', emoji: '🍚' },
+  { id: 'chinese', label: '중식', emoji: '🥟' },
+  { id: 'japanese', label: '일식', emoji: '🍱' },
+  { id: 'western', label: '양식', emoji: '🍝' },
+  { id: 'fast-food', label: '패스트푸드', emoji: '🍔' },
+  { id: 'asian', label: '아시안', emoji: '🍜' },
+  { id: 'bunsik', label: '분식', emoji: '🍢' },
+  { id: 'chicken', label: '치킨', emoji: '🍗' },
+  { id: 'pizza', label: '피자', emoji: '🍕' },
+  { id: 'salad', label: '샐러드', emoji: '🥗' },
+  { id: 'healthy', label: '건강식', emoji: '🥙' },
+];
 
 interface RestaurantRecommendationScreenNewProps {
   userProfile: UserProfile;
@@ -80,7 +93,7 @@ const MOCK_RESTAURANTS: Restaurant[] = [
   },
 ];
 
-type QuestionStep = 'initial' | 'emotion' | 'companion' | 'preference' | 'budget' | 'loading' | 'result';
+type QuestionStep = 'initial' | 'howMode' | 'dessertCategory' | 'emotion' | 'companion' | 'category' | 'preference' | 'budget' | 'loading' | 'result';
 
 export function RestaurantRecommendationScreenNew({ userProfile, userLocation }: RestaurantRecommendationScreenNewProps) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -90,9 +103,12 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
   // Question flow states
   const [questionStep, setQuestionStep] = useState<QuestionStep>('initial');
   const [isQuickMode, setIsQuickMode] = useState(false);
+  const [selectedMealType, setSelectedMealType] = useState<string>('');
+  const [selectedDessertCategory, setSelectedDessertCategory] = useState<string>('');
   const [selectedEmotion, setSelectedEmotion] = useState<string>('');
   const [selectedCompanion, setSelectedCompanion] = useState<string>('');
-  const [selectedPreference, setSelectedPreference] = useState<string>('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
   const [selectedBudget, setSelectedBudget] = useState<string>('');
 
   // Feedback modal state
@@ -156,17 +172,23 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
       const currentHour = new Date().getHours();
       const weather = weatherData?.condition || '맑음';
 
-      // Ensure we use the latest userProfile.user_id
+      // 커피·디저트 + 서브카테고리 선택 시: 맛/동행/예산 대신 디저트 카테고리만 전달
+      const isDessertFlow = selectedMealType === '커피·디저트' && selectedDessertCategory;
+      const emotionParam = isDessertFlow ? undefined : (isQuick ? undefined : selectedEmotion);
+      const companionParam = isDessertFlow ? undefined : (isQuick ? undefined : selectedCompanion);
+      const preferenceParam = isDessertFlow ? selectedDessertCategory : (isQuick ? undefined : (selectedPreferences.length > 0 ? selectedPreferences.join(', ') : undefined));
+      const budgetParam = isDessertFlow ? undefined : (isQuick ? undefined : selectedBudget);
+
       const data = await recommendService.getRecommendations(
         userProfile.user_id,
         userLocationData?.lat || DEFAULT_LAT,
         userLocationData?.lng || DEFAULT_LNG,
         weather,
         currentHour,
-        isQuick ? undefined : selectedEmotion,
-        isQuick ? undefined : selectedCompanion,
-        isQuick ? undefined : selectedPreference,
-        isQuick ? undefined : selectedBudget
+        emotionParam,
+        companionParam,
+        preferenceParam,
+        budgetParam
       );
 
       if (data && data.length > 0) {
@@ -193,21 +215,21 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
 
   const handleCustomRecommendation = () => {
     setIsQuickMode(false);
-    setQuestionStep('emotion');
+    if (selectedMealType === '커피·디저트') {
+      setQuestionStep('dessertCategory');
+    } else {
+      setQuestionStep('emotion');
+    }
   };
 
   const handleNextQuestion = (value: string, currentStep: QuestionStep) => {
     switch (currentStep) {
       case 'emotion':
         setSelectedEmotion(value);
-        setQuestionStep('companion');
+        setQuestionStep('category');
         break;
       case 'companion':
         setSelectedCompanion(value);
-        setQuestionStep('preference');
-        break;
-      case 'preference':
-        setSelectedPreference(value);
         setQuestionStep('budget');
         break;
       case 'budget':
@@ -220,17 +242,26 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
 
   const handleBack = () => {
     switch (questionStep) {
-      case 'emotion':
+      case 'howMode':
         setQuestionStep('initial');
         break;
-      case 'companion':
+      case 'dessertCategory':
+        setQuestionStep('howMode');
+        break;
+      case 'emotion':
+        setQuestionStep('howMode');
+        break;
+      case 'category':
         setQuestionStep('emotion');
         break;
       case 'preference':
-        setQuestionStep('companion');
+        setQuestionStep('category');
+        break;
+      case 'companion':
+        setQuestionStep('preference');
         break;
       case 'budget':
-        setQuestionStep('preference');
+        setQuestionStep('companion');
         break;
       case 'result':
         setQuestionStep('initial');
@@ -250,21 +281,58 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
     setShowFeedbackModal(true);
   };
 
-  // Initial Question Screen
+  // 1. 무엇을 추천해드릴까요? – 메인 / 사이드 / 커피·디저트
   if (questionStep === 'initial') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center px-5 pb-20">
         <div className="max-w-md w-full">
           <div className="text-center mb-6">
-            <p className="text-base font-bold text-gray-600 mb-2">1/5</p>
+            <p className="text-base font-bold text-gray-600 mb-2">1/7</p>
             <div className="flex gap-1.5 justify-center">
-              {[1, 2, 3, 4, 5].map((s) => (
+              {[1, 2, 3, 4, 5, 6, 7].map((s) => (
                 <div key={s} className={`h-1.5 rounded-full transition-all ${s === 1 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />
               ))}
             </div>
           </div>
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">오늘은 뭐 먹을까요?</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">무엇을 추천해드릴까요?</h1>
+            <p className="text-base text-gray-600">메인 요리부터 간단한 것까지</p>
+          </div>
+          <div className="space-y-3">
+            {[
+              { emoji: '🍽️', text: '메인디쉬', desc: '든든한 한 끼' },
+              { emoji: '☕', text: '커피·디저트', desc: '카페·빵·케이크' },
+            ].map((option) => (
+              <button key={option.text} onClick={() => { setSelectedMealType(option.text); setQuestionStep('howMode'); }} className="w-full bg-white rounded-2xl p-5 shadow-md border-2 border-transparent hover:border-green-500 group">
+                <div className="flex items-center gap-4">
+                  <div className="text-4xl">{option.emoji}</div>
+                  <div className="flex-1 text-left"><p className="text-base font-bold text-gray-900">{option.text}</p><p className="text-sm text-gray-600">{option.desc}</p></div>
+                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-green-600" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. 어떻게 추천해드릴까요? – 바로 추천 / 상황에 맞는 질문
+  if (questionStep === 'howMode') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
+        <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
+        <div className="max-w-md mx-auto flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
+          <div className="text-center mb-6">
+            <p className="text-base font-bold text-gray-600 mb-2">2/7</p>
+            <div className="flex gap-1.5 justify-center">
+              {[1, 2, 3, 4, 5, 6, 7].map((s) => (
+                <div key={s} className={`h-1.5 rounded-full transition-all ${s <= 2 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />
+              ))}
+            </div>
+          </div>
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">어떻게 추천해드릴까요?</h1>
             <p className="text-base text-gray-600">선택해주시면 딱 맞는 메뉴를<br />추천해드릴게요!</p>
           </div>
           <div className="space-y-3">
@@ -278,7 +346,7 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
             <button onClick={handleCustomRecommendation} className="w-full bg-white rounded-2xl p-6 shadow-md border-2 border-blue-500 group">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center"><MessageCircle className="w-7 h-7 text-white" /></div>
-                <div className="flex-1 text-left"><h3 className="text-lg font-bold text-gray-900 mb-1">상황에 맞는 음식을 추천받고 싶어요</h3><p className="text-sm text-gray-600">질문으로 알아보기</p></div>
+                <div className="flex-1 text-left"><h3 className="text-lg font-bold text-gray-900 mb-1">상황에 맞는 음식 추천</h3><p className="text-sm text-gray-600">질문으로 알아보기</p></div>
                 <ArrowRight className="w-6 h-6 text-blue-600" />
               </div>
             </button>
@@ -288,16 +356,73 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
     );
   }
 
-  // Emotion Question (2/5)
+  // 3. 커피·디저트 – 어떤 게 땡기시나요? (빵/과자류, 음료, 차)
+  if (questionStep === 'dessertCategory') {
+    const DESSERT_OPTIONS = [
+      { emoji: '🥐', text: '빵/과자류', desc: '빵, 케이크, 과자' },
+      { emoji: '🥤', text: '음료/차', desc: '커피, 주스, 스무디, 티, 라떼' },
+    ];
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
+        <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-6">
+            <p className="text-base font-bold text-gray-600 mb-2">3/7</p>
+            <div className="flex gap-1.5 justify-center">
+              {[1, 2, 3, 4, 5, 6, 7].map((s) => (
+                <div key={s} className={`h-1.5 rounded-full transition-all ${s <= 3 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />
+              ))}
+            </div>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">어떤 게 땡기시나요?</h2>
+          <p className="text-sm text-gray-500 text-center mb-4">하나 골라주세요</p>
+          <div className="space-y-3 mb-6">
+            {DESSERT_OPTIONS.map((option) => (
+              <button
+                key={option.text}
+                onClick={() => setSelectedDessertCategory(option.text)}
+                className={`w-full rounded-2xl p-5 shadow-md border-2 transition-all text-left flex items-center gap-4 ${selectedDessertCategory === option.text ? 'border-green-600 bg-green-50' : 'border-transparent bg-white hover:border-green-500 group'}`}
+              >
+                <div className="text-4xl">{option.emoji}</div>
+                <div className="flex-1">
+                  <p className="text-base font-bold text-gray-900">{option.text}</p>
+                  <p className="text-sm text-gray-600">{option.desc}</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-green-600" />
+              </button>
+            ))}
+          </div>
+          <Button
+            onClick={() => {
+              setQuestionStep('loading');
+              setTimeout(() => generateRecommendations(false), 1500);
+            }}
+            disabled={!selectedDessertCategory}
+            className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl disabled:opacity-50"
+          >
+            다음 <ArrowRight className="w-5 h-5 ml-1 inline" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Emotion Question (3/7)
   if (questionStep === 'emotion') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
         <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
         <div className="max-w-md mx-auto">
-          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">2/5</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5].map((s) => (<div key={s} className={`h-1.5 rounded-full transition-all ${s <= 2 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />))}</div></div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">지금 기분은 어떠세요?</h2>
+          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">3/7</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5, 6, 7].map((s) => (<div key={s} className={`h-1.5 rounded-full transition-all ${s <= 3 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />))}</div></div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">기분이 어떠신가요?</h2>
           <div className="grid grid-cols-2 gap-3">
-            {[{ emoji: '😊', text: '기분 좋아요', value: '기분 좋을 때' }, { emoji: '😴', text: '피곤해요', value: '피곤할 때' }, { emoji: '🤔', text: '고민돼요', value: '고민될 때' }, { emoji: '😋', text: '배고파요', value: '배고플 때' }].map((option) => (
+            {[
+              { emoji: '🙂', text: '그냥 그래요', value: '그냥 그래요' },
+              { emoji: '😄', text: '기분 좋아요', value: '기분 좋아요' },
+              { emoji: '😴', text: '피곤해요', value: '피곤해요' },
+              { emoji: '😡', text: '스트레스 받아요', value: '스트레스 받아요' },
+              { emoji: '🥺', text: '위로가 필요해요', value: '위로가 필요해요' },
+            ].map((option) => (
               <button key={option.value} onClick={() => handleNextQuestion(option.value, 'emotion')} className="bg-white rounded-2xl p-5 shadow-md border-2 border-transparent hover:border-green-500 group">
                 <div className="text-4xl mb-2">{option.emoji}</div>
                 <p className="text-base font-bold text-gray-900">{option.text}</p>
@@ -309,14 +434,88 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
     );
   }
 
-  // Companion Question (3/5)
+  // Category Question (4/7) – 어떤 음식이 좋으신가요? (음식 메뉴)
+  const toggleCategory = (label: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(label) ? prev.filter((c) => c !== label) : [...prev, label]
+    );
+  };
+
+  const handleCategoryNext = () => {
+    setQuestionStep('preference');
+  };
+
+  if (questionStep === 'category') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
+        <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">4/7</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5, 6, 7].map((s) => (<div key={s} className={`h-1.5 rounded-full transition-all ${s <= 4 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />))}</div></div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">어떤 음식이 좋으신가요?</h2>
+          <p className="text-sm text-gray-500 text-center mb-4">복수 선택 가능</p>
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            {FOOD_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => toggleCategory(cat.label)}
+                className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${selectedCategories.includes(cat.label) ? 'border-green-600 bg-green-50 shadow-sm' : 'border-gray-100 hover:border-green-200 bg-white'}`}
+              >
+                <span className="text-xl">{cat.emoji}</span>
+                <span className="text-[11px] font-bold text-gray-700">{cat.label}</span>
+              </button>
+            ))}
+          </div>
+          <Button onClick={handleCategoryNext} className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl">
+            다음 <ArrowRight className="w-5 h-5 ml-1 inline" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Preference Question (5/7) – 어떤 맛이 땡기시나요? (복수 선택)
+  const PREFERENCE_OPTIONS = [{ emoji: '🥗', text: '가볍게', value: '가벼운' }, { emoji: '🍜', text: '든든하게', value: '든든한' }, { emoji: '🌶️', text: '매콤하게', value: '매콤한' }, { emoji: '🍚', text: '담백하게', value: '담백한' }, { emoji: '🍕', text: '기름진 거', value: '기름진' }, { emoji: '✨', text: '아무거나', value: '아무거나' }];
+  const togglePreference = (value: string) => {
+    setSelectedPreferences((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  };
+  if (questionStep === 'preference') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
+        <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">5/7</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5, 6, 7].map((s) => (<div key={s} className={`h-1.5 rounded-full transition-all ${s <= 5 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />))}</div></div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">어떤 맛이 땡기시나요?</h2>
+          <p className="text-sm text-gray-500 text-center mb-4">복수 선택 가능</p>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            {PREFERENCE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => togglePreference(option.value)}
+                className={`rounded-2xl p-5 shadow-md border-2 transition-all flex flex-col items-center justify-center min-h-[80px] ${selectedPreferences.includes(option.value) ? 'border-green-600 bg-green-50' : 'border-transparent bg-white hover:border-green-500 group'}`}
+              >
+                <div className="text-3xl mb-2">{option.emoji}</div>
+                <p className="text-sm font-bold text-gray-900">{option.text}</p>
+              </button>
+            ))}
+          </div>
+          <Button onClick={() => setQuestionStep('companion')} className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl">
+            다음 <ArrowRight className="w-5 h-5 ml-1 inline" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Companion Question (6/7) – 누구와 드시나요?
   if (questionStep === 'companion') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
         <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
         <div className="max-w-md mx-auto">
-          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">3/5</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5].map((s) => (<div key={s} className={`h-1.5 rounded-full transition-all ${s <= 3 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />))}</div></div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">누구랑 드시나요?</h2>
+          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">6/7</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5, 6, 7].map((s) => (<div key={s} className={`h-1.5 rounded-full transition-all ${s <= 6 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />))}</div></div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">누구와 드시나요?</h2>
           <div className="space-y-3">
             {[{ emoji: '🙋', text: '혼자', desc: '나만의 시간' }, { emoji: '👥', text: '친구/동료와', desc: '함께 즐겁게' }, { emoji: '❤️', text: '연인/가족과', desc: '특별한 식사' }].map((option) => (
               <button key={option.text} onClick={() => handleNextQuestion(option.text, 'companion')} className="w-full bg-white rounded-2xl p-5 shadow-md border-2 border-transparent hover:border-green-500 group">
@@ -333,34 +532,13 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
     );
   }
 
-  // Preference Question (4/5)
-  if (questionStep === 'preference') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
-        <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
-        <div className="max-w-md mx-auto">
-          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">4/5</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5].map((s) => (<div key={s} className={`h-1.5 rounded-full transition-all ${s <= 4 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />))}</div></div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">어떤 음식이 땡기시나요?</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {[{ emoji: '🥗', text: '가볍게', value: '가벼운' }, { emoji: '🍜', text: '든든하게', value: '든든한' }, { emoji: '🌶️', text: '매콤하게', value: '매콤한' }, { emoji: '🍚', text: '담백하게', value: '담백한' }, { emoji: '🍕', text: '기름진 거', value: '기름진' }, { emoji: '✨', text: '아무거나', value: '아무거나' }].map((option) => (
-              <button key={option.value} onClick={() => handleNextQuestion(option.value, 'preference')} className="bg-white rounded-2xl p-5 shadow-md border-2 border-transparent hover:border-green-500 group">
-                <div className="text-3xl mb-2">{option.emoji}</div>
-                <p className="text-sm font-bold text-gray-900">{option.text}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Budget Question (5/5)
+  // Budget Question (7/7)
   if (questionStep === 'budget') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
         <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
         <div className="max-w-md mx-auto">
-          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">5/5</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5].map((s) => (<div key={s} className="w-8 h-1.5 bg-green-600 rounded-full" />))}</div></div>
+          <div className="text-center mb-6"><p className="text-base font-bold text-gray-600 mb-2">7/7</p><div className="flex gap-1.5 justify-center">{[1, 2, 3, 4, 5, 6, 7].map((s) => (<div key={s} className="w-8 h-1.5 bg-green-600 rounded-full" />))}</div></div>
           <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">예산은 어느 정도인가요?</h2>
           <div className="space-y-3">
             {[{ emoji: '💵', text: '1만원 이하', desc: '가성비 최고', value: '저렴' }, { emoji: '💰', text: '1~2만원', desc: '적당한 가격', value: '보통' }, { emoji: '💎', text: '2만원 이상', desc: '제대로 즐기기', value: '고급' }].map((option) => (

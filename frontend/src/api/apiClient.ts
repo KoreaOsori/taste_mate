@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+// Docker 등에서 VITE_USE_PROXY=true 이면 같은 출처(/api/v1)로 요청 → Vite가 백엔드로 프록시
+const API_BASE_URL =
+  import.meta.env.VITE_USE_PROXY === 'true'
+    ? '/api/v1'
+    : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1');
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,

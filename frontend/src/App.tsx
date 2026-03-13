@@ -84,11 +84,8 @@ export interface Comment {
 import { supabase } from './utils/supabaseClient';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
-    const saved = localStorage.getItem('tastemate_currentScreen');
-    if (saved) return saved as Screen;
-    return 'login';
-  });
+  // 첫 화면은 항상 로그인. 세션 확인 후 fetchUserProfile에서 저장된 화면으로 복원
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<Meal[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(() => {
@@ -243,10 +240,22 @@ export default function App() {
       if (error.response && error.response.status === 404) {
         console.log('New user (404 status), directing to location setup');
         setCurrentScreen('location');
+      } else if (error.response && error.response.status === 503) {
+        console.error('Backend could not reach DB (Supabase):', error);
+        alert(
+          '백엔드가 DB(Supabase)에 연결하지 못했습니다.\n\n' +
+          'Docker 사용 시: docs/07_Docker_Setup_Guide.md 의 Q3 참고하여 백엔드만 로컬에서 실행해 보세요.\n' +
+          '(프론트는 Docker, 백엔드는 PC에서 python main.py 또는 run_local.bat)'
+        );
+        handleLogout();
       } else if (error.request) {
-        // 네트워크 에러 (CORS, 서버 다운 등)
         console.error('Network error requesting profile:', error);
-        alert('백엔드 서버(FastAPI)와 통신할 수 없습니다. \n\n1. 백엔드 서버가 port 8000에서 실행 중인지 확인해 주세요.\n2. 서버가 실행 중이라면 터미널에서 오류 메시지가 없는지 확인해 주세요.');
+        alert(
+          '프로필 서버와 통신할 수 없습니다.\n\n' +
+          '로그인은 Supabase로 되지만, 프로필/식단 등은 이 앱의 백엔드(FastAPI)를 통해 가져옵니다.\n\n' +
+          '1. 백엔드가 port 8000에서 실행 중인지 확인해 주세요.\n' +
+          '2. Docker 사용 시: 컨테이너를 재시작한 뒤 브라우저 새로고침(Ctrl+Shift+R) 해 보세요.'
+        );
         handleLogout();
       } else {
         console.error('Other error fetching profile:', error);

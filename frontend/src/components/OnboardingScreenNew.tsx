@@ -14,21 +14,6 @@ interface OnboardingScreenProps {
   userName?: string;
 }
 
-const foodCategories = [
-  { id: 'korean', label: '한식', emoji: '🍚' },
-  { id: 'chinese', label: '중식', emoji: '🥟' },
-  { id: 'japanese', label: '일식', emoji: '🍱' },
-  { id: 'western', label: '양식', emoji: '🍝' },
-  { id: 'fast-food', label: '패스트푸드', emoji: '🍔' },
-  { id: 'cafe', label: '카페/디저트', emoji: '☕' },
-  { id: 'asian', label: '아시안', emoji: '🍜' },
-  { id: 'bunsik', label: '분식', emoji: '🍢' },
-  { id: 'chicken', label: '치킨', emoji: '🍗' },
-  { id: 'pizza', label: '피자', emoji: '🍕' },
-  { id: 'salad', label: '샐러드', emoji: '🥗' },
-  { id: 'healthy', label: '건강식', emoji: '🥙' },
-];
-
 export function OnboardingScreenNew({ onComplete, userId, userName = '' }: OnboardingScreenProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -123,7 +108,7 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
       dinner_notify: formData.dinnerNotify,
       activity_level: formData.activityLevel,
       goal: formData.healthGoal,
-      preferred_categories: formData.preferredCategories,
+      preferred_categories: [], // 추천 화면에서 선택하도록 함
       disliked_foods: formData.dislikedFoods.split(',').map(s => s.trim()).filter(s => s !== ''),
       location: '',
       location_consent: formData.locationConsent,
