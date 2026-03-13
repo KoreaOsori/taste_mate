@@ -245,39 +245,39 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white pb-20">
       {/* 인사말 / 위치 */}
-      <div className="px-6 pt-8 pb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-gray-900">{greeting}, {userProfile.name}님</h1>
+      <div className="px-4 pt-4 pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-xl font-bold text-gray-900 truncate">{greeting}, {userProfile.name}님</h1>
           </div>
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-500">{userProfile.location || '위치 정보 확인 중...'}</span>
+          <div className="flex items-center gap-1.5 shrink-0 text-right">
+            <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <span className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-none">{userProfile.location || '위치 정보 확인 중...'}</span>
           </div>
         </div>
       </div>
 
       {/* 오늘 식사/영양 요약 */}
-      <div className="px-6 py-4">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-2xl font-bold text-gray-900">오늘의 영양소 섭취</h2>
-          <div className="flex items-baseline justify-center gap-1 bg-green-50 rounded-2xl px-4 py-2 border-2 border-green-200">
-            <span className="text-4xl font-bold text-green-600">{balanceScore}</span>
-            <span className="text-base font-semibold text-gray-600">점</span>
+      <div className="px-4 py-2">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-xl font-bold text-gray-900">오늘의 영양소 섭취</h2>
+          <div className="flex items-baseline justify-center gap-1 bg-green-50 rounded-xl px-3 py-1.5 border-2 border-green-200 shrink-0">
+            <span className="text-3xl font-bold text-green-600">{balanceScore}</span>
+            <span className="text-sm font-semibold text-gray-600">점</span>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-2 gap-3">
           {/* Calories */}
-          <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-3xl p-6 border-3 border-orange-300 shadow-md">
-            <div className="flex items-center gap-3 mb-4">
-              <Flame className="w-7 h-7 text-orange-600" />
-              <span className="text-base font-bold text-gray-800">칼로리</span>
+          <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl p-4 border-2 border-orange-300 shadow-md">
+            <div className="flex items-center gap-2 mb-2">
+              <Flame className="w-6 h-6 text-orange-600" />
+              <span className="text-sm font-bold text-gray-800">칼로리</span>
             </div>
-            <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-gray-900">{displayCalories}</span>
-              <span className="text-base font-medium text-gray-600">/ {userProfile.target_calories}</span>
+            <div className="flex items-baseline gap-1.5 mb-2">
+              <span className="text-2xl font-bold text-gray-900">{displayCalories}</span>
+              <span className="text-sm font-medium text-gray-600">/ {userProfile.target_calories}</span>
             </div>
-            <div className="bg-orange-200 rounded-full h-3 overflow-hidden">
+            <div className="bg-orange-200 rounded-full h-2.5 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-orange-500 to-red-500 h-full rounded-full transition-all duration-300"
                 style={{ width: `${caloriePercentage}%` }}
@@ -286,16 +286,16 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
           </div>
 
           {/* Protein - 파란색 (캘린더 뷰와 통일) */}
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-3xl p-6 border-3 border-blue-300 shadow-md">
-            <div className="flex items-center gap-3 mb-4">
-              <Egg className="w-7 h-7 text-blue-600" />
-              <span className="text-base font-bold text-gray-800">단백질</span>
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-4 border-2 border-blue-300 shadow-md">
+            <div className="flex items-center gap-2 mb-2">
+              <Egg className="w-6 h-6 text-blue-600" />
+              <span className="text-sm font-bold text-gray-800">단백질</span>
             </div>
-            <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-gray-900">{displayProtein}g</span>
-              <span className="text-base font-medium text-gray-600">/ {targetProtein}g</span>
+            <div className="flex items-baseline gap-1.5 mb-2">
+              <span className="text-2xl font-bold text-gray-900">{displayProtein}g</span>
+              <span className="text-sm font-medium text-gray-600">/ {targetProtein}g</span>
             </div>
-            <div className="bg-blue-200 rounded-full h-3 overflow-hidden">
+            <div className="bg-blue-200 rounded-full h-2.5 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full rounded-full transition-all duration-300"
                 style={{ width: `${proteinPercentage}%` }}
@@ -304,16 +304,16 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
           </div>
 
           {/* Carbs */}
-          <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-3xl p-6 border-3 border-yellow-300 shadow-md">
-            <div className="flex items-center gap-3 mb-4">
-              <Wheat className="w-7 h-7 text-yellow-700" />
-              <span className="text-base font-bold text-gray-800">탄수화물</span>
+          <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-2xl p-4 border-2 border-yellow-300 shadow-md">
+            <div className="flex items-center gap-2 mb-2">
+              <Wheat className="w-6 h-6 text-yellow-700" />
+              <span className="text-sm font-bold text-gray-800">탄수화물</span>
             </div>
-            <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-gray-900">{displayCarbs}g</span>
-              <span className="text-base font-medium text-gray-600">/ {targetCarbs}g</span>
+            <div className="flex items-baseline gap-1.5 mb-2">
+              <span className="text-2xl font-bold text-gray-900">{displayCarbs}g</span>
+              <span className="text-sm font-medium text-gray-600">/ {targetCarbs}g</span>
             </div>
-            <div className="bg-yellow-200 rounded-full h-3 overflow-hidden">
+            <div className="bg-yellow-200 rounded-full h-2.5 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-yellow-500 to-amber-500 h-full rounded-full transition-all duration-300"
                 style={{ width: `${carbsPercentage}%` }}
@@ -322,16 +322,16 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
           </div>
 
           {/* Fat - 주황색 (캘린더 뷰와 통일) */}
-          <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-3xl p-6 border-3 border-orange-300 shadow-md">
-            <div className="flex items-center gap-3 mb-4">
-              <Nut className="w-7 h-7 text-orange-600" />
-              <span className="text-base font-bold text-gray-800">지방</span>
+          <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-4 border-2 border-orange-300 shadow-md">
+            <div className="flex items-center gap-2 mb-2">
+              <Nut className="w-6 h-6 text-orange-600" />
+              <span className="text-sm font-bold text-gray-800">지방</span>
             </div>
-            <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-gray-900">{displayFat}g</span>
-              <span className="text-base font-medium text-gray-600">/ {targetFat}g</span>
+            <div className="flex items-baseline gap-1.5 mb-2">
+              <span className="text-2xl font-bold text-gray-900">{displayFat}g</span>
+              <span className="text-sm font-medium text-gray-600">/ {targetFat}g</span>
             </div>
-            <div className="bg-orange-200 rounded-full h-3 overflow-hidden">
+            <div className="bg-orange-200 rounded-full h-2.5 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-orange-500 to-amber-500 h-full rounded-full transition-all duration-300"
                 style={{ width: `${fatPercentage}%` }}
@@ -342,15 +342,15 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
       </div>
 
       {/* 오늘의 식습관 조언 */}
-      <div className="px-6 py-4">
-        <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl shadow-xl p-10 text-white">
-          <div className="flex items-start gap-5">
-            <div className="w-20 h-20 bg-white/30 rounded-3xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm">
-              <Sparkles className="w-10 h-10" />
+      <div className="px-4 py-3">
+        <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg p-5 text-white">
+          <div className="flex items-start gap-3">
+            <div className="w-14 h-14 bg-white/30 rounded-2xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm">
+              <Sparkles className="w-7 h-7" />
             </div>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-4">오늘의 식습관 조언</h2>
-              <p className="text-white text-xl leading-relaxed font-medium">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-bold mb-2">오늘의 식습관 조언</h2>
+              <p className="text-white text-base leading-relaxed font-medium">
                 {getDietaryAdvice()}
               </p>
             </div>
@@ -359,11 +359,11 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
       </div>
 
       {/* 4. 조언/팁/커뮤니티 - Community & Challenge Carousel */}
-      <div className="px-6 py-2">
+      <div className="px-4 py-2">
         <div className="relative h-40 overflow-hidden">
           {currentCommunityItem ? (
             <div
-              className="bg-white rounded-3xl shadow-xl p-8 border-3 border-gray-200 transition-all duration-500"
+              className="bg-white rounded-2xl shadow-md p-5 border-2 border-gray-200 transition-all duration-500"
               key={currentCommunityIndex}
               onTouchStart={handleCommunityTouchStart}
               onTouchMove={handleCommunityTouchMove}
@@ -413,7 +413,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
         </div>
 
         {/* Pagination Dots */}
-        <div className="flex items-center justify-center gap-2 mt-4">
+        <div className="flex items-center justify-center gap-2 mt-2">
           {[...communityItems, null].map((_, index) => (
             <div
               key={index}
@@ -427,9 +427,9 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
       </div>
 
       {/* Health Tips Auto Carousel - Enhanced text */}
-      <div className="px-6 py-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">알아두면 좋은 식습관 정보</h2>
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-gray-900">알아두면 좋은 식습관 정보</h2>
           <div className="flex gap-1.5">
             {healthTips.map((_, index) => (
               <div
@@ -443,14 +443,14 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
           </div>
         </div>
 
-        <div className={`bg-gradient-to-br ${currentTip.color} rounded-3xl p-10 text-white shadow-xl transition-all duration-500`}>
-          <div className="flex items-start gap-5">
-            <div className="w-20 h-20 bg-white/30 rounded-3xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm text-5xl">
+        <div className={`bg-gradient-to-br ${currentTip.color} rounded-2xl p-5 text-white shadow-lg transition-all duration-500`}>
+          <div className="flex items-start gap-3">
+            <div className="w-14 h-14 bg-white/30 rounded-2xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm text-3xl">
               {currentTip.icon}
             </div>
-            <div className="flex-1">
-              <h3 className="text-3xl font-bold mb-4">{currentTip.title}</h3>
-              <p className="text-white text-xl leading-relaxed font-medium">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-bold mb-2">{currentTip.title}</h3>
+              <p className="text-white text-base leading-relaxed font-medium">
                 {currentTip.content}
               </p>
             </div>

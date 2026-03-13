@@ -22,6 +22,8 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
     height: userProfile?.height?.toString() || '',
     weight: userProfile?.weight?.toString() || '',
     target_weight: userProfile?.target_weight?.toString() || '',
+    goal: (userProfile?.goal || 'balanced') as 'lose' | 'balanced' | 'gain',
+    activity_level: (userProfile?.activity_level || 'moderate') as 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active',
     breakfast_time: userProfile?.breakfast_time || '08:00',
     lunch_time: userProfile?.lunch_time || '12:00',
     dinner_time: userProfile?.dinner_time || '18:00',
@@ -44,6 +46,8 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
         height: userProfile.height?.toString() || '',
         weight: userProfile.weight?.toString() || '',
         target_weight: userProfile.target_weight?.toString() || '',
+        goal: userProfile.goal || 'balanced',
+        activity_level: userProfile.activity_level || 'moderate',
         breakfast_time: userProfile.breakfast_time || '08:00',
         lunch_time: userProfile.lunch_time || '12:00',
         dinner_time: userProfile.dinner_time || '18:00',
@@ -67,14 +71,43 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
     );
   }
 
+  // 목표·활동 수준 변경 시 목표 칼로리 재계산 (온보딩과 동일 공식)
+  const calculateTargetCalories = () => {
+    const weightNum = parseInt(formData.weight) || 70;
+    const heightNum = parseInt(formData.height) || 170;
+    const ageNum = parseInt(formData.age) || 25;
+    const gender = userProfile.gender || 'male';
+    const activityMultipliers: Record<string, number> = {
+      sedentary: 1.2,
+      light: 1.375,
+      moderate: 1.55,
+      active: 1.725,
+      'very-active': 1.9,
+    };
+    let bmr = 0;
+    if (gender === 'male') {
+      bmr = 88.36 + 13.4 * weightNum + 4.8 * heightNum - 5.7 * ageNum;
+    } else {
+      bmr = 447.6 + 9.2 * weightNum + 3.1 * heightNum - 4.3 * ageNum;
+    }
+    let tdee = bmr * (activityMultipliers[formData.activity_level] ?? 1.55);
+    if (formData.goal === 'lose') tdee -= 500;
+    if (formData.goal === 'gain') tdee += 500;
+    return Math.round(tdee);
+  };
+
   const handleSave = async () => {
+    const target_calories = calculateTargetCalories();
     const updatedProfile = {
       ...userProfile,
       name: formData.name,
-      age: parseInt(formData.age),
-      height: parseInt(formData.height),
-      weight: parseInt(formData.weight),
-      target_weight: parseInt(formData.target_weight),
+      age: parseInt(formData.age) || userProfile.age,
+      height: parseInt(formData.height) || userProfile.height,
+      weight: parseInt(formData.weight) || userProfile.weight,
+      target_weight: parseInt(formData.target_weight) || userProfile.target_weight,
+      goal: formData.goal,
+      activity_level: formData.activity_level,
+      target_calories,
       breakfast_time: formData.breakfast_time,
       lunch_time: formData.lunch_time,
       dinner_time: formData.dinner_time,
@@ -92,7 +125,6 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
       setShowEditModal(false);
     } catch (error) {
       console.error('Error updating profile:', error);
-      // Still update local state to reflect UI changes if desired, or show alert
       setUserProfile(updatedProfile);
       setShowEditModal(false);
     }
@@ -360,6 +392,61 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
                     className="mt-1"
                   />
                 </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-900 font-bold">나의 목표</Label>
+                <p className="text-xs text-gray-500 mb-2">변경 시 목표 칼로리가 자동으로 다시 계산돼요</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'lose' as const, label: '체중 감량', emoji: '🥗' },
+                    { value: 'balanced' as const, label: '건강 유지', emoji: '⚖️' },
+                    { value: 'gain' as const, label: '근육 성장', emoji: '💪' },
+                  ].map((g) => (
+                    <button
+                      key={g.value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, goal: g.value })}
+                      className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${formData.goal === g.value
+                        ? 'border-green-600 bg-green-50 shadow-sm'
+                        : 'border-gray-100 hover:border-green-200 bg-white'
+                        }`}
+                    >
+                      <span className="text-xl">{g.emoji}</span>
+                      <span className="text-[11px] font-bold text-gray-700">{g.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-gray-900 font-bold">활동 수준</Label>
+                <p className="text-xs text-gray-500 mb-2">일상 활동량에 맞춰 목표 칼로리가 달라져요</p>
+                <div className="space-y-2">
+                  {[
+                    { value: 'sedentary' as const, label: '비활동적', desc: '주로 앉아서 생활' },
+                    { value: 'light' as const, label: '가벼움', desc: '가벼운 이동·산책' },
+                    { value: 'moderate' as const, label: '적당함', desc: '일주일 1~3회 운동' },
+                    { value: 'active' as const, label: '활기참', desc: '일주일 4~5회 운동' },
+                    { value: 'very-active' as const, label: '매우 활발', desc: '격렬한 운동 거의 매일' },
+                  ].map((level) => (
+                    <button
+                      key={level.value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, activity_level: level.value })}
+                      className={`w-full p-3 rounded-xl border-2 text-left transition-all ${formData.activity_level === level.value
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-100 bg-white hover:border-green-200'
+                        }`}
+                    >
+                      <p className="font-bold text-sm text-gray-900">{level.label}</p>
+                      <p className="text-xs text-gray-500">{level.desc}</p>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-green-600 mt-2">
+                  예상 목표 칼로리: <strong>{calculateTargetCalories()} kcal</strong>/일
+                </p>
               </div>
 
               <div>
