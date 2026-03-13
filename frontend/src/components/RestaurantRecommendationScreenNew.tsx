@@ -308,18 +308,19 @@ export function RestaurantRecommendationScreenNew({
         restaurant_link: restaurant.naverLink,
         timestamp: now.toISOString(),
       } as any);
-    } catch (error) {
-      console.error('Failed to log meal from recommendation:', error);
-    } finally {
-      // 캘린더로 이동하여 방금 기록한 날짜를 바로 보여주기
+      // 저장 성공 시에만 캘린더로 이동해 해당 날짜에 기록이 보이도록
       if (onLogMealToCalendar) {
         onLogMealToCalendar(dateKey);
       } else {
         onNavigate('calendar');
       }
-
       setFeedbackRestaurant({ name: restaurant.name, menu: restaurant.signature });
       setShowFeedbackModal(true);
+    } catch (error) {
+      console.error('Failed to log meal from recommendation:', error);
+      setFeedbackRestaurant({ name: restaurant.name, menu: restaurant.signature });
+      setShowFeedbackModal(true);
+      // 실패해도 피드백 모달은 띄우고, 캘린더 이동은 하지 않음 (또는 토스트로 실패 안내 가능)
     }
   };
 

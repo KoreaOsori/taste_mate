@@ -23,18 +23,29 @@ import uuid
 supabase = get_supabase_client()
 
 @router.get("/", response_model=List[MealRecord])
-async def get_meals(user_id: UUID4, date: Optional[str] = None):
+async def get_meals(
+    user_id: UUID4,
+    date: Optional[str] = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+):
     """
-    Fetch meals for a specific user and optionally a specific date (YYYY-MM-DD) from Supabase.
+    Fetch meals for a user.
+    - date (YYYY-MM-DD): single day.
+    - year + month: entire month (UTC). Ignores date if both provided.
     """
     query = supabase.table("meals").select("*").eq("user_id", str(user_id))
-    
-    if date:
-        # PostgreSQL date filtering for timestamp column
+
+    if year is not None and month is not None:
+        from calendar import monthrange
+        _, last = monthrange(year, month)
+        start = f"{year}-{month:02d}-01T00:00:00Z"
+        end = f"{year}-{month:02d}-{last}T23:59:59Z"
+        query = query.gte("timestamp", start).lte("timestamp", end)
+    elif date:
         query = query.gte("timestamp", f"{date}T00:00:00Z").lte("timestamp", f"{date}T23:59:59Z")
-        
+
     response = query.execute()
-    # Map 'type' from DB to Pydantic if necessary, but here they match
     return response.data
 
 @router.post("/", response_model=MealRecord)

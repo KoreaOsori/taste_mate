@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UserProfile, Meal, Screen } from '../App';
-import { ChevronLeft, ChevronRight, Flame, TrendingUp, TrendingDown, Minus, Sparkles, Plus, X, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Flame, TrendingUp, TrendingDown, Minus, Sparkles, Plus, Loader2, UtensilsCrossed } from 'lucide-react';
 import { Button } from './ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { mealService } from '../api/apiClient';
+import { mealService, recommendService, type FoodSuggestion } from '../api/apiClient';
 
 interface CalendarScreenProps {
   userProfile: UserProfile;
@@ -23,6 +24,8 @@ interface DayData {
 export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelectedDate }: CalendarScreenProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(initialSelectedDate ?? null);
+  /** 'month' = 캘린더만, 'day' = 그날 메뉴 전용 화면(한 단계 깊이) */
+  const [calendarView, setCalendarView] = useState<'month' | 'day'>('month');
   const [showAddMealDialog, setShowAddMealDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [newMeal, setNewMeal] = useState({
@@ -34,55 +37,132 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
     fat: '',
   });
   const [calendarData, setCalendarData] = useState<Record<string, DayData>>({});
+  const [foodSuggestions, setFoodSuggestions] = useState<FoodSuggestion[]>([]);
+  const [foodSearchLoading, setFoodSearchLoading] = useState(false);
+  const [addMealError, setAddMealError] = useState<string | null>(null);
+  const foodSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Prop에서 초기 선택 날짜가 바뀌면 동기화
+  // 음식 이름 입력 시 디바운스 검색 → 비슷한 음식 추천
+  useEffect(() => {
+    if (!showAddMealDialog) return;
+    const name = newMeal.foodName.trim();
+    if (name.length < 1) {
+      setFoodSuggestions([]);
+      return;
+    }
+    if (foodSearchTimeoutRef.current) clearTimeout(foodSearchTimeoutRef.current);
+    foodSearchTimeoutRef.current = setTimeout(async () => {
+      setFoodSearchLoading(true);
+      try {
+        const list = await recommendService.foodSearch(name);
+        setFoodSuggestions(list);
+      } catch {
+        setFoodSuggestions([]);
+      } finally {
+        setFoodSearchLoading(false);
+      }
+    }, 300);
+    return () => {
+      if (foodSearchTimeoutRef.current) clearTimeout(foodSearchTimeoutRef.current);
+    };
+  }, [showAddMealDialog, newMeal.foodName]);
+
+  const applyFoodSuggestion = (s: FoodSuggestion) => {
+    setNewMeal(prev => ({
+      ...prev,
+      foodName: s.name,
+      calories: String(Math.round(s.calories ?? 0)),
+      protein: s.protein != null ? String(s.protein) : '',
+      carbs: s.carbs != null ? String(s.carbs) : '',
+      fat: s.fat != null ? String(s.fat) : '',
+    }));
+    setFoodSuggestions([]);
+  };
+
+  // Prop에서 초기 선택 날짜가 바뀌면 동기화 (추천에서 넘어올 때 오늘 그날 보기로 진입)
   useEffect(() => {
     if (initialSelectedDate) {
       setSelectedDate(initialSelectedDate);
+      setCalendarView('day');
     }
   }, [initialSelectedDate]);
 
-  // Fetch meals when selected day changes or on initial mount
+  const mapMealsToDay = (meals: any[]): Meal[] =>
+    meals.map((m: any) => ({
+      id: m.id || Math.random().toString(),
+      type: m.type as any,
+      foodName: m.food_name,
+      calories: m.calories,
+      protein: m.protein || 0,
+      carbs: m.carbs || 0,
+      fat: m.fat || 0,
+      timestamp: m.timestamp
+    }));
+
+  // 표시 중인 월의 식사 데이터를 한 번에 조회 → 캘린더에 '데이터 있는 날' 표시
   useEffect(() => {
-    const fetchMonthMeals = async () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1; // 1-based for API
+    const fetchMonth = async () => {
       setIsLoading(true);
       try {
-        // In a real app, we might fetch the entire month. 
-        // For now, we fetch for the currently selected date if it exists.
-        if (selectedDate) {
-          const meals = await mealService.getMeals(userProfile.user_id, selectedDate);
-
-          const dayMeals: Meal[] = meals.map((m: any) => ({
-            id: m.id || Math.random().toString(),
-            type: m.type as any,
-            foodName: m.food_name,
-            calories: m.calories,
-            protein: m.protein || 0,
-            carbs: m.carbs || 0,
-            fat: m.fat || 0,
-            timestamp: m.timestamp
-          }));
-
-          const totalCalories = dayMeals.reduce((sum: number, m: Meal) => sum + m.calories, 0);
-
-          setCalendarData(prev => ({
-            ...prev,
-            [selectedDate]: {
-              date: selectedDate,
-              calories: totalCalories,
-              meals: dayMeals
-            }
-          }));
+        const meals = await mealService.getMealsForMonth(userProfile.user_id, year, month);
+        const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+        const next: Record<string, DayData> = {};
+        for (let d = 1; d <= lastDay; d++) {
+          const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const dayMeals = meals.filter((m: any) => {
+            const t = new Date(m.timestamp);
+            return t.getFullYear() === year && t.getMonth() + 1 === month && t.getDate() === d;
+          });
+          const mapped = mapMealsToDay(dayMeals);
+          const calories = mapped.reduce((sum, m) => sum + m.calories, 0);
+          next[dateKey] = { date: dateKey, calories, meals: mapped };
         }
-      } catch (error) {
-        console.error("Failed to fetch meals:", error);
+        setCalendarData(prev => ({ ...prev, ...next }));
+      } catch (e) {
+        console.error("Failed to fetch month meals:", e);
       } finally {
         setIsLoading(false);
       }
     };
+    fetchMonth();
+  }, [currentDate.getFullYear(), currentDate.getMonth(), userProfile.user_id]);
 
-    fetchMonthMeals();
-  }, [selectedDate, userProfile.user_id]);
+  // 그날 보기 화면인데 해당 날짜 데이터가 아직 없으면 → 해당 일자만 조회해서 반드시 채움 (로딩 무한 방지)
+  useEffect(() => {
+    if (calendarView !== 'day' || !selectedDate) return;
+    if (calendarData[selectedDate] !== undefined) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const meals = await mealService.getMeals(userProfile.user_id, selectedDate);
+        if (cancelled) return;
+        const mapped = mapMealsToDay(meals);
+        const calories = mapped.reduce((s, m) => s + m.calories, 0);
+        setCalendarData(prev => ({ ...prev, [selectedDate]: { date: selectedDate, calories, meals: mapped } }));
+      } catch (e) {
+        if (cancelled) return;
+        console.error("Failed to fetch day meals:", e);
+        setCalendarData(prev => ({ ...prev, [selectedDate]: { date: selectedDate, calories: 0, meals: [] } }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [calendarView, selectedDate, userProfile.user_id]);
+
+  // 날짜 클릭 → 해당 월로 이동(필요 시) + 그날 보기 화면으로 한 단계 진입
+  const onSelectDate = (dateKey: string) => {
+    setSelectedDate(dateKey);
+    const d = new Date(dateKey + 'T12:00:00');
+    if (d.getFullYear() !== currentDate.getFullYear() || d.getMonth() !== currentDate.getMonth()) {
+      setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
+    setCalendarView('day');
+  };
+
+  const backToCalendar = () => {
+    setCalendarView('month');
+  };
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -143,61 +223,75 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
   };
 
   const handleAddMeal = async () => {
-    if (selectedDate) {
-      setIsLoading(true);
-      try {
-        const mealToCreate = {
-          user_id: userProfile.user_id,
-          type: newMeal.type,
-          food_name: newMeal.foodName,
-          calories: parseFloat(newMeal.calories),
-          protein: parseFloat(newMeal.protein) || 0,
-          carbs: parseFloat(newMeal.carbs) || 0,
-          fat: parseFloat(newMeal.fat) || 0,
-          timestamp: new Date(selectedDate + 'T12:00:00').toISOString(),
-        };
+    setAddMealError(null);
+    const name = newMeal.foodName?.trim();
+    if (!name) {
+      setAddMealError('음식 이름을 입력해 주세요.');
+      return;
+    }
+    if (!selectedDate) {
+      setAddMealError('날짜를 먼저 선택해 주세요. 캘린더에서 날짜를 탭한 뒤 다시 시도해 주세요.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const mealToCreate = {
+        user_id: userProfile.user_id,
+        type: newMeal.type,
+        food_name: name,
+        calories: parseFloat(newMeal.calories) || 0,
+        protein: parseFloat(newMeal.protein) || 0,
+        carbs: parseFloat(newMeal.carbs) || 0,
+        fat: parseFloat(newMeal.fat) || 0,
+        timestamp: new Date(selectedDate + 'T12:00:00').toISOString(),
+      };
 
-        const createdMeal = await mealService.createMeal(mealToCreate as any);
+      const createdMeal = await mealService.createMeal(mealToCreate as any);
 
-        // Update local state
-        const updatedMeals: Meal[] = [...(calendarData[selectedDate]?.meals || []), {
-          id: createdMeal.id || Math.random().toString(),
-          type: createdMeal.type as any,
-          foodName: createdMeal.food_name,
-          calories: createdMeal.calories,
-          protein: createdMeal.protein || 0,
-          carbs: createdMeal.carbs || 0,
-          fat: createdMeal.fat || 0,
-          timestamp: createdMeal.timestamp
-        }];
+      // Update local state so the new meal shows immediately
+      const updatedMeals: Meal[] = [...(calendarData[selectedDate]?.meals || []), {
+        id: createdMeal.id || Math.random().toString(),
+        type: createdMeal.type as any,
+        foodName: createdMeal.food_name,
+        calories: createdMeal.calories,
+        protein: createdMeal.protein || 0,
+        carbs: createdMeal.carbs || 0,
+        fat: createdMeal.fat || 0,
+        timestamp: createdMeal.timestamp
+      }];
 
-        const totalCalories = updatedMeals.reduce((sum: number, m: Meal) => sum + m.calories, 0);
+      const totalCalories = updatedMeals.reduce((sum: number, m: Meal) => sum + m.calories, 0);
 
-        setCalendarData(prev => ({
-          ...prev,
-          [selectedDate]: {
-            date: selectedDate,
-            calories: totalCalories,
-            meals: updatedMeals
-          }
-        }));
+      setCalendarData(prev => ({
+        ...prev,
+        [selectedDate]: {
+          date: selectedDate,
+          calories: totalCalories,
+          meals: updatedMeals
+        }
+      }));
 
-        setShowAddMealDialog(false);
-        setNewMeal({
-          type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
-          foodName: '',
-          calories: '',
-          protein: '',
-          carbs: '',
-          fat: '',
-        });
-      } catch (error) {
-        console.error("Failed to add meal:", error);
-      } finally {
-        setIsLoading(false);
-      }
+      setShowAddMealDialog(false);
+      setAddMealError(null);
+      setNewMeal({
+        type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+        foodName: '',
+        calories: '',
+        protein: '',
+        carbs: '',
+        fat: '',
+      });
+    } catch (error: any) {
+      console.error("Failed to add meal:", error);
+      const message = error?.response?.data?.detail ?? error?.message ?? '식사 저장에 실패했습니다. 다시 시도해 주세요.';
+      setAddMealError(typeof message === 'string' ? message : JSON.stringify(message));
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const dayLabel = (type: string) =>
+    type === 'breakfast' ? '아침' : type === 'lunch' ? '점심' : type === 'dinner' ? '저녁' : '간식';
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -206,6 +300,137 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
           <Loader2 className="h-10 w-10 animate-spin text-white" />
         </div>
       )}
+
+      {calendarView === 'day' && selectedDate ? (
+        /* 그날 보기 전용 화면 (한 단계 깊이) */
+        <div className="min-h-screen bg-gray-50">
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shadow-sm">
+            <button
+              onClick={backToCalendar}
+              className="p-2 -ml-1 rounded-lg hover:bg-gray-100"
+              aria-label="캘린더로 돌아가기"
+            >
+              <ChevronLeft className="w-6 h-6 text-gray-700" />
+            </button>
+            <h1 className="text-lg font-bold text-gray-900 flex-1">
+              {new Date(selectedDate + 'T12:00:00').toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long',
+              })}
+            </h1>
+          </div>
+          <div className="px-4 py-5 pb-24">
+            {!selectedDayData ? (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                <Loader2 className="w-10 h-10 animate-spin mb-3" />
+                <span>해당 날짜 불러오는 중...</span>
+              </div>
+            ) : selectedDayData.meals.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <UtensilsCrossed className="w-10 h-10 text-gray-400" />
+                </div>
+                <p className="text-gray-600 font-medium mb-1">이 날 기록된 식사가 없어요</p>
+                <p className="text-sm text-gray-500 mb-6">첫 식사를 기록해 보세요</p>
+                <Button onClick={() => setShowAddMealDialog(true)} className="bg-green-600 hover:bg-green-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  첫 식사 기록하기
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="bg-white rounded-2xl shadow-sm p-5 mb-4 border border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm text-gray-500">총 섭취 칼로리</span>
+                    <div className="flex items-center gap-1.5">
+                      <Flame className="w-5 h-5 text-orange-500" />
+                      <span className="text-2xl font-bold text-gray-900">{selectedDayData.calories}kcal</span>
+                    </div>
+                  </div>
+                  {(() => {
+                    const status = getCalorieStatus(selectedDayData.calories);
+                    const StatusIcon = status.icon;
+                    return (
+                      <div className={`flex items-center gap-2 text-sm ${status.color}`}>
+                        <StatusIcon className="w-4 h-4" />
+                        <span>{status.text}</span>
+                        <span className="text-gray-400">· 목표 {userProfile.target_calories}kcal</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {selectedDayData.meals.length > 0 && (() => {
+                  const totalProtein = selectedDayData.meals.reduce((s, m) => s + m.protein, 0);
+                  const totalCarbs = selectedDayData.meals.reduce((s, m) => s + m.carbs, 0);
+                  const totalFat = selectedDayData.meals.reduce((s, m) => s + m.fat, 0);
+                  const totalMacros = totalProtein + totalCarbs + totalFat;
+                  const proteinPercent = totalMacros ? Math.round((totalProtein / totalMacros) * 100) : 0;
+                  const carbsPercent = totalMacros ? Math.round((totalCarbs / totalMacros) * 100) : 0;
+                  const fatPercent = totalMacros ? Math.round((totalFat / totalMacros) * 100) : 0;
+                  return (
+                    <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-4 mb-6 border border-green-100">
+                      <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-green-600" />
+                        영양소 균형
+                      </h3>
+                      <div className="flex h-5 rounded-full overflow-hidden mb-3">
+                        <div className="bg-blue-500 flex items-center justify-center text-xs text-white" style={{ width: `${proteinPercent}%` }}>{proteinPercent > 12 && `${proteinPercent}%`}</div>
+                        <div className="bg-yellow-500 flex items-center justify-center text-xs text-white" style={{ width: `${carbsPercent}%` }}>{carbsPercent > 12 && `${carbsPercent}%`}</div>
+                        <div className="bg-orange-500 flex items-center justify-center text-xs text-white" style={{ width: `${fatPercent}%` }}>{fatPercent > 12 && `${fatPercent}%`}</div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                        <div><span className="text-gray-500">단백질</span> <span className="font-semibold text-gray-900">{totalProtein}g</span></div>
+                        <div><span className="text-gray-500">탄수화물</span> <span className="font-semibold text-gray-900">{totalCarbs}g</span></div>
+                        <div><span className="text-gray-500">지방</span> <span className="font-semibold text-gray-900">{totalFat}g</span></div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <UtensilsCrossed className="w-4 h-4 text-green-600" />
+                    그날 메뉴
+                  </h3>
+                  <Button size="sm" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => setShowAddMealDialog(true)}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    추가
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {selectedDayData.meals.map((meal) => (
+                    <div key={meal.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-xs font-medium text-green-600 uppercase">{dayLabel(meal.type)}</span>
+                          <h4 className="font-semibold text-gray-900 mt-0.5 truncate">{meal.foodName}</h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(meal.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-lg font-bold text-green-600">{meal.calories}</p>
+                          <p className="text-xs text-gray-500">kcal</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600">
+                        <span>단백질 {meal.protein}g</span>
+                        <span>탄수화물 {meal.carbs}g</span>
+                        <span>지방 {meal.fat}g</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* 월 보기: 캘린더 그리드만 (하단 상세 패널 없음) */
+        <>
       {/* Header with AI Report Button */}
       <div className="bg-gradient-to-br from-green-600 to-green-700 text-white px-6 pt-8 pb-6">
         <div className="flex items-center justify-between mb-2">
@@ -266,12 +491,12 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
             return (
               <button
                 key={dateKey}
-                onClick={() => setSelectedDate(dateKey)}
+                onClick={() => onSelectDate(dateKey)}
                 className={`aspect-square rounded-xl p-1 flex flex-col items-center justify-center transition-all ${isSelected
                   ? 'bg-green-600 text-white shadow-lg scale-105'
                   : isToday
                     ? 'bg-green-100 text-green-900'
-                    : dayData
+                    : dayData && dayData.meals.length > 0
                       ? 'bg-white shadow-sm hover:shadow-md'
                       : 'bg-gray-50 text-gray-400'
                   }`}
@@ -279,7 +504,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
                 <span className={`text-sm font-medium mb-1 ${isSelected ? 'text-white' : ''}`}>
                   {date.getDate()}
                 </span>
-                {dayData && (
+                {dayData && dayData.meals.length > 0 && (
                   <div className="flex items-center gap-0.5">
                     <Flame className={`w-3 h-3 ${isSelected ? 'text-white' : 'text-orange-500'}`} />
                     <span className={`text-xs ${isSelected ? 'text-white' : 'text-gray-600'}`}>
@@ -291,303 +516,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
             );
           })}
         </div>
-
-        {/* Selected Day Details */}
-        {selectedDayData && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 animate-in fade-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">
-                {new Date(selectedDate!).toLocaleDateString('ko-KR', {
-                  month: 'long',
-                  day: 'numeric',
-                  weekday: 'short',
-                })}
-              </h3>
-              <div className="flex items-center gap-2">
-                <Flame className="w-5 h-5 text-orange-500" />
-                <span className="text-2xl font-bold text-gray-900">
-                  {selectedDayData.calories}kcal
-                </span>
-              </div>
-            </div>
-
-            {/* Calorie Status */}
-            <div className="mb-4">
-              {(() => {
-                const status = getCalorieStatus(selectedDayData.calories);
-                const StatusIcon = status.icon;
-                return (
-                  <div className={`flex items-center gap-2 ${status.color}`}>
-                    <StatusIcon className="w-5 h-5" />
-                    <span className="font-medium">{status.text}</span>
-                    <span className="text-sm text-gray-500">
-                      (목표: {userProfile.target_calories}kcal)
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Nutrition Balance */}
-            {selectedDayData.meals.length > 0 && (() => {
-              const totalProtein = selectedDayData.meals.reduce((sum: number, meal: Meal) => sum + meal.protein, 0);
-              const totalCarbs = selectedDayData.meals.reduce((sum: number, meal: Meal) => sum + meal.carbs, 0);
-              const totalFat = selectedDayData.meals.reduce((sum: number, meal: Meal) => sum + meal.fat, 0);
-              const totalMacros = totalProtein + totalCarbs + totalFat;
-
-              const proteinPercent = Math.round((totalProtein / totalMacros) * 100);
-              const carbsPercent = Math.round((totalCarbs / totalMacros) * 100);
-              const fatPercent = Math.round((totalFat / totalMacros) * 100);
-
-              return (
-                <div className="mb-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-4 border border-green-100">
-                  <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-green-600" />
-                    영양소 균형
-                  </h4>
-
-                  {/* Macro Distribution Bar */}
-                  <div className="mb-3">
-                    <div className="flex h-6 rounded-full overflow-hidden">
-                      <div
-                        className="bg-blue-500 flex items-center justify-center text-xs text-white font-medium"
-                        style={{ width: `${proteinPercent}%` }}
-                      >
-                        {proteinPercent > 10 && `${proteinPercent}%`}
-                      </div>
-                      <div
-                        className="bg-yellow-500 flex items-center justify-center text-xs text-white font-medium"
-                        style={{ width: `${carbsPercent}%` }}
-                      >
-                        {carbsPercent > 10 && `${carbsPercent}%`}
-                      </div>
-                      <div
-                        className="bg-orange-500 flex items-center justify-center text-xs text-white font-medium"
-                        style={{ width: `${fatPercent}%` }}
-                      >
-                        {fatPercent > 10 && `${fatPercent}%`}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Macro Details */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-white/60 rounded-lg p-2">
-                      <div className="flex items-center gap-1 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                        <span className="text-xs text-gray-600">단백질</span>
-                      </div>
-                      <p className="font-bold text-gray-900">{totalProtein}g</p>
-                      <p className="text-xs text-gray-500">{proteinPercent}%</p>
-                    </div>
-                    <div className="bg-white/60 rounded-lg p-2">
-                      <div className="flex items-center gap-1 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                        <span className="text-xs text-gray-600">탄수화물</span>
-                      </div>
-                      <p className="font-bold text-gray-900">{totalCarbs}g</p>
-                      <p className="text-xs text-gray-500">{carbsPercent}%</p>
-                    </div>
-                    <div className="bg-white/60 rounded-lg p-2">
-                      <div className="flex items-center gap-1 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                        <span className="text-xs text-gray-600">지방</span>
-                      </div>
-                      <p className="font-bold text-gray-900">{totalFat}g</p>
-                      <p className="text-xs text-gray-500">{fatPercent}%</p>
-                    </div>
-                  </div>
-
-                  {/* Balance Assessment */}
-                  <div className="mt-3 pt-3 border-t border-green-200">
-                    {(() => {
-                      // Ideal: Protein 20-35%, Carbs 45-65%, Fat 20-35%
-                      const isBalanced =
-                        proteinPercent >= 20 && proteinPercent <= 35 &&
-                        carbsPercent >= 45 && carbsPercent <= 65 &&
-                        fatPercent >= 20 && fatPercent <= 35;
-
-                      if (isBalanced) {
-                        return (
-                          <p className="text-xs text-green-700 font-medium">
-                            ✨ 영양 균형이 잘 맞춰져 있어요!
-                          </p>
-                        );
-                      } else if (proteinPercent < 20) {
-                        return (
-                          <p className="text-xs text-blue-700 font-medium">
-                            💪 단백질 섭취를 조금 더 늘려보세요
-                          </p>
-                        );
-                      } else if (carbsPercent > 65) {
-                        return (
-                          <p className="text-xs text-yellow-700 font-medium">
-                            🌾 탄수화물 비중이 높아요. 채소와 단백질을 더해보세요
-                          </p>
-                        );
-                      } else if (fatPercent > 35) {
-                        return (
-                          <p className="text-xs text-orange-700 font-medium">
-                            🥑 지방 섭취가 많아요. 가벼운 식사를 고려해보세요
-                          </p>
-                        );
-                      } else {
-                        return (
-                          <p className="text-xs text-gray-600">
-                            영양소를 골고루 섭취하고 있어요
-                          </p>
-                        );
-                      }
-                    })()}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Meals List */}
-            {selectedDayData.meals.length > 0 ? (
-              <div className="space-y-3 mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-700">식사 기록</h4>
-                  <Button
-                    onClick={() => setShowAddMealDialog(true)}
-                    size="sm"
-                    variant="outline"
-                    className="text-green-600 border-green-600 hover:bg-green-50"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    추가
-                  </Button>
-                </div>
-                {selectedDayData.meals.map((meal) => (
-                  <div key={meal.id} className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <span className="text-xs font-medium text-gray-500 uppercase">
-                          {meal.type === 'breakfast' ? '아침' :
-                            meal.type === 'lunch' ? '점심' :
-                              meal.type === 'dinner' ? '저녁' : '간식'}
-                        </span>
-                        <h5 className="font-medium text-gray-900 mt-1">{meal.foodName}</h5>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(meal.timestamp).toLocaleTimeString('ko-KR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-green-600">{meal.calories}</p>
-                        <p className="text-xs text-gray-500">kcal</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3 text-xs text-gray-600 pt-2 border-t border-gray-200">
-                      <span>단백질 {meal.protein}g</span>
-                      <span>탄수화물 {meal.carbs}g</span>
-                      <span>지방 {meal.fat}g</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 mb-4">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Flame className="w-8 h-8 text-gray-400" />
-                </div>
-                <p className="text-gray-600 mb-4">기록된 식사가 없습니다</p>
-                <Button
-                  onClick={() => setShowAddMealDialog(true)}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  첫 식사 기록하기
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Add Meal Dialog */}
-        <Dialog open={showAddMealDialog} onOpenChange={setShowAddMealDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>식사 추가</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="mealType">식사 시간</Label>
-                <Select
-                  value={newMeal.type}
-                  onValueChange={(value: 'breakfast' | 'lunch' | 'dinner' | 'snack') =>
-                    setNewMeal({ ...newMeal, type: value })
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="식사 시간 선택">
-                      {newMeal.type === 'breakfast' ? '아침' :
-                        newMeal.type === 'lunch' ? '점심' :
-                          newMeal.type === 'dinner' ? '저녁' : '간식'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="breakfast">아침</SelectItem>
-                    <SelectItem value="lunch">점심</SelectItem>
-                    <SelectItem value="dinner">저녁</SelectItem>
-                    <SelectItem value="snack">간식</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="foodName">음식 이름</Label>
-                <Input
-                  id="foodName"
-                  value={newMeal.foodName}
-                  onChange={(e) => setNewMeal({ ...newMeal, foodName: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="calories">칼로리 (kcal)</Label>
-                <Input
-                  id="calories"
-                  value={newMeal.calories}
-                  onChange={(e) => setNewMeal({ ...newMeal, calories: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="protein">단백질 (g)</Label>
-                <Input
-                  id="protein"
-                  value={newMeal.protein}
-                  onChange={(e) => setNewMeal({ ...newMeal, protein: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="carbs">탄수화물 (g)</Label>
-                <Input
-                  id="carbs"
-                  value={newMeal.carbs}
-                  onChange={(e) => setNewMeal({ ...newMeal, carbs: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fat">지방 (g)</Label>
-                <Input
-                  id="fat"
-                  value={newMeal.fat}
-                  onChange={(e) => setNewMeal({ ...newMeal, fat: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <Button
-                onClick={handleAddMeal}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                추가하기
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <p className="text-center text-sm text-gray-500 mt-2">날짜를 탭하면 그날 메뉴를 볼 수 있어요</p>
 
         {/* Summary Stats */}
         <div className="mt-6 bg-gradient-to-br from-blue-50 to-green-50 rounded-2xl p-6 border border-blue-100">
@@ -606,6 +535,162 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
           </div>
         </div>
       </div>
+        </>
+      )}
+
+      {/* 식사 추가 다이얼로그 (월/일 뷰 공통) */}
+      <Dialog
+        open={showAddMealDialog}
+        onOpenChange={(open) => {
+          setShowAddMealDialog(open);
+          if (!open) {
+            setFoodSuggestions([]);
+            setAddMealError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>식사 추가</DialogTitle>
+            {addMealError && (
+              <p className="text-sm text-red-600 font-medium mt-2" role="alert">
+                {addMealError}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="mealType">식사 시간</Label>
+              <Select
+                value={newMeal.type}
+                onValueChange={(value: 'breakfast' | 'lunch' | 'dinner' | 'snack') =>
+                  setNewMeal({ ...newMeal, type: value })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="식사 시간 선택">
+                    {newMeal.type === 'breakfast' ? '아침' :
+                      newMeal.type === 'lunch' ? '점심' :
+                        newMeal.type === 'dinner' ? '저녁' : '간식'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="breakfast">아침</SelectItem>
+                  <SelectItem value="lunch">점심</SelectItem>
+                  <SelectItem value="dinner">저녁</SelectItem>
+                  <SelectItem value="snack">간식</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 relative">
+              <Label htmlFor="foodName">음식 이름</Label>
+              <Input
+                id="foodName"
+                placeholder="예: 김치찌개, 국밥"
+                value={newMeal.foodName}
+                onChange={(e) => setNewMeal({ ...newMeal, foodName: e.target.value })}
+              />
+              {!foodSearchLoading && foodSuggestions.length > 0 && (
+                <div className="border border-gray-200 rounded-lg mt-1 overflow-hidden bg-white shadow-sm max-h-48 overflow-y-auto">
+                  {foodSuggestions.map((s, i) => (
+                    <button
+                      key={`${s.name}-${i}`}
+                      type="button"
+                      className="w-full text-left px-3 py-2.5 hover:bg-green-50 flex items-center justify-between gap-2 text-sm"
+                      onClick={() => applyFoodSuggestion(s)}
+                    >
+                      <span className="font-medium text-gray-900 truncate">{s.name}</span>
+                      <span className="text-green-600 shrink-0">{Math.round(s.calories ?? 0)}kcal</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="calories" className="text-gray-700">칼로리</Label>
+              <p className="text-xs text-gray-500 mb-1">모르면 비워두거나 아래에서 골라보세요</p>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {[
+                  { label: '가벼운 ~200', value: '200' },
+                  { label: '보통 ~450', value: '450' },
+                  { label: '든든한 ~600', value: '600' },
+                ].map(({ label, value }) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={newMeal.calories === value ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setNewMeal({ ...newMeal, calories: value })}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              <Input
+                id="calories"
+                type="number"
+                placeholder="직접 입력 (kcal)"
+                value={newMeal.calories}
+                onChange={(e) => setNewMeal({ ...newMeal, calories: e.target.value })}
+              />
+            </div>
+            <Collapsible defaultOpen={false} className="border rounded-lg border-gray-200">
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="group flex w-full items-center justify-between px-4 py-3 text-left text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+                >
+                  <span>상세 영양 정보 (선택)</span>
+                  <ChevronDown className="w-4 h-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="protein" className="text-gray-600">단백질 (g)</Label>
+                    <Input
+                      id="protein"
+                      type="number"
+                      placeholder="선택"
+                      value={newMeal.protein}
+                      onChange={(e) => setNewMeal({ ...newMeal, protein: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="carbs" className="text-gray-600">탄수화물 (g)</Label>
+                    <Input
+                      id="carbs"
+                      type="number"
+                      placeholder="선택"
+                      value={newMeal.carbs}
+                      onChange={(e) => setNewMeal({ ...newMeal, carbs: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fat" className="text-gray-600">지방 (g)</Label>
+                    <Input
+                      id="fat"
+                      type="number"
+                      placeholder="선택"
+                      value={newMeal.fat}
+                      onChange={(e) => setNewMeal({ ...newMeal, fat: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button
+              onClick={handleAddMeal}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              추가하기
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

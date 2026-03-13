@@ -85,6 +85,13 @@ export const mealService = {
         });
         return response.data;
     },
+    /** 해당 월 전체 식사 조회 (캘린더에 '데이터 있는 날' 표시용) */
+    getMealsForMonth: async (userId: string, year: number, month: number) => {
+        const response = await apiClient.get<MealRecord[]>('/meals/', {
+            params: { user_id: userId, year, month },
+        });
+        return response.data;
+    },
     createMeal: async (meal: MealRecord) => {
         const response = await apiClient.post<MealRecord>('/meals/', meal);
         return response.data;
@@ -102,6 +109,15 @@ export const profileService = {
     },
 };
 
+/** 음식 이름 검색 추천 (식사 추가 시 foods_v2 기반) */
+export interface FoodSuggestion {
+    name: string;
+    calories: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+}
+
 export const recommendService = {
     getRecommendations: async (userId: string, lat?: number, lng?: number, weather?: string, hour?: number, emotion?: string, companion?: string, preference?: string, budget?: string) => {
         const response = await apiClient.get<Restaurant[]>(`/recommend/${userId}`, {
@@ -114,6 +130,14 @@ export const recommendService = {
             params: { lat, lng },
         });
         return response.data;
+    },
+    /** 음식 이름으로 DB 검색 → 비슷한 음식 추천 (칼로리·영양소 자동 입력용) */
+    foodSearch: async (q: string): Promise<FoodSuggestion[]> => {
+        if (!q?.trim()) return [];
+        const response = await apiClient.get<FoodSuggestion[]>('/recommend/food-search', {
+            params: { q: q.trim() },
+        });
+        return response.data ?? [];
     },
 };
 

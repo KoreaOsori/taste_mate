@@ -179,6 +179,34 @@ def get_foods_v2_candidates() -> List[dict]:
         print(f"Error fetching foods_v2: {e}")
         return []
 
+
+@router.get("/food-search")
+async def food_search(q: Optional[str] = None):
+    """
+    음식 이름으로 foods_v2 검색. 식사 추가 시 비슷한 음식 추천용.
+    q가 비어 있거나 1자 미만이면 빈 배열 반환.
+    """
+    if not q or len(q.strip()) < 1:
+        return []
+    try:
+        from db.supabase_client import get_supabase_client
+        supabase = get_supabase_client()
+        # ilike: Supabase는 * 를 와일드카드로 사용
+        term = q.strip().replace("*", "")
+        pattern = f"*{term}*"
+        response = (
+            supabase.table("foods_v2")
+            .select("name, calories, protein, carbs, fat")
+            .eq("is_active", True)
+            .ilike("name", pattern)
+            .limit(10)
+            .execute()
+        )
+        return response.data or []
+    except Exception as e:
+        print(f"Error in food_search: {e}")
+        return []
+
 async def generate_personalized_query_and_reasons(
     user_id: str,
     profile: Optional[dict],
