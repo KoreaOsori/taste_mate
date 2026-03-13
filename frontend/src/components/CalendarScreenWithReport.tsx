@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { UserProfile, Meal, Screen } from '../App';
-import { ChevronLeft, ChevronRight, ChevronDown, Flame, TrendingUp, TrendingDown, Minus, Sparkles, Plus, Loader2, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Flame, TrendingUp, TrendingDown, Minus, Sparkles, Plus, Loader2, UtensilsCrossed, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
@@ -293,6 +293,26 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
   const dayLabel = (type: string) =>
     type === 'breakfast' ? '아침' : type === 'lunch' ? '점심' : type === 'dinner' ? '저녁' : '간식';
 
+  const handleDeleteMeal = async (meal: Meal) => {
+    if (!selectedDate) return;
+    if (!confirm(`"${meal.foodName}" 메뉴를 삭제할까요?`)) return;
+    try {
+      await mealService.deleteMeal(userProfile.user_id, meal.id);
+    } catch (e) {
+      console.warn('Delete meal (backend):', e);
+    }
+    const nextMeals = (calendarData[selectedDate]?.meals || []).filter((m) => m.id !== meal.id);
+    const totalCalories = nextMeals.reduce((sum: number, m: Meal) => sum + m.calories, 0);
+    setCalendarData((prev) => ({
+      ...prev,
+      [selectedDate]: {
+        date: selectedDate,
+        calories: totalCalories,
+        meals: nextMeals,
+      },
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {isLoading && (
@@ -420,9 +440,19 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
                             {new Date(meal.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-lg font-bold text-green-600">{meal.calories}</p>
-                          <p className="text-xs text-gray-500">kcal</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-lg font-bold text-green-600 inline-flex items-baseline gap-1">
+                            {meal.calories}
+                            <span className="text-sm font-medium text-gray-500">kcal</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMeal(meal)}
+                            className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center"
+                            aria-label="메뉴 삭제"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                       <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600">

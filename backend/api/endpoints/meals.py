@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, UUID4
@@ -87,3 +87,21 @@ async def create_meal(meal: MealRecord):
         raise HTTPException(status_code=400, detail="Failed to log meal record")
         
     return response.data[0]
+
+
+@router.delete("/{meal_id}")
+async def delete_meal(meal_id: str, user_id: UUID4 = Query(...)):
+    """
+    Delete a meal by id. user_id is required to ensure the meal belongs to the user.
+    """
+    user_id_str = str(user_id)
+    if user_id_str == "guest":
+        user_id_str = GUEST_USER_UUID
+    response = (
+        supabase.table("meals")
+        .delete()
+        .eq("id", meal_id)
+        .eq("user_id", user_id_str)
+        .execute()
+    )
+    return {"success": True}

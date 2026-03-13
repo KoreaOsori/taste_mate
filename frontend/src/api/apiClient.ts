@@ -104,6 +104,11 @@ export const mealService = {
         const response = await apiClient.post<MealRecord>('/meals/', payload);
         return response.data;
     },
+    deleteMeal: async (userId: string, mealId: string) => {
+        await apiClient.delete(`/meals/${mealId}`, {
+            params: { user_id: mealUserId(userId) },
+        });
+    },
 };
 
 export const profileService = {
