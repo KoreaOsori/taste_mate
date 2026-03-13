@@ -260,10 +260,10 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
       {/* 오늘 식사/영양 요약 */}
       <div className="px-6 py-4">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-3xl font-bold text-gray-900">오늘의 영양소 섭취</h2>
-          <div className="text-center bg-green-50 rounded-2xl px-4 py-2 border-2 border-green-200">
-            <div className="text-4xl font-bold text-green-600">{balanceScore}</div>
-            <div className="text-sm font-semibold text-gray-600">점</div>
+          <h2 className="text-2xl font-bold text-gray-900">오늘의 영양소 섭취</h2>
+          <div className="flex items-baseline justify-center gap-1 bg-green-50 rounded-2xl px-4 py-2 border-2 border-green-200">
+            <span className="text-4xl font-bold text-green-600">{balanceScore}</span>
+            <span className="text-base font-semibold text-gray-600">점</span>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-5">
@@ -349,7 +349,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
               <Sparkles className="w-10 h-10" />
             </div>
             <div className="flex-1">
-              <h2 className="text-3xl font-bold mb-4">오늘의 식습관 조언</h2>
+              <h2 className="text-2xl font-bold mb-4">오늘의 식습관 조언</h2>
               <p className="text-white text-xl leading-relaxed font-medium">
                 {getDietaryAdvice()}
               </p>
@@ -429,7 +429,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
       {/* Health Tips Auto Carousel - Enhanced text */}
       <div className="px-6 py-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-3xl font-bold text-gray-900">알아두면 좋은 식습관 정보</h2>
+          <h2 className="text-2xl font-bold text-gray-900">알아두면 좋은 식습관 정보</h2>
           <div className="flex gap-1.5">
             {healthTips.map((_, index) => (
               <div
