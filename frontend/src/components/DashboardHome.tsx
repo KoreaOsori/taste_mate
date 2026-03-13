@@ -285,19 +285,19 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
             </div>
           </div>
 
-          {/* Protein */}
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-6 border-3 border-amber-300 shadow-md">
+          {/* Protein - 파란색 (캘린더 뷰와 통일) */}
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-3xl p-6 border-3 border-blue-300 shadow-md">
             <div className="flex items-center gap-3 mb-4">
-              <Egg className="w-7 h-7 text-amber-700" />
+              <Egg className="w-7 h-7 text-blue-600" />
               <span className="text-base font-bold text-gray-800">단백질</span>
             </div>
             <div className="flex items-baseline gap-2 mb-3">
               <span className="text-4xl font-bold text-gray-900">{displayProtein}g</span>
               <span className="text-base font-medium text-gray-600">/ {targetProtein}g</span>
             </div>
-            <div className="bg-amber-200 rounded-full h-3 overflow-hidden">
+            <div className="bg-blue-200 rounded-full h-3 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-amber-500 to-orange-500 h-full rounded-full transition-all duration-300"
+                className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full rounded-full transition-all duration-300"
                 style={{ width: `${proteinPercentage}%` }}
               />
             </div>
@@ -321,19 +321,19 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
             </div>
           </div>
 
-          {/* Fat */}
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-3xl p-6 border-3 border-blue-300 shadow-md">
+          {/* Fat - 주황색 (캘린더 뷰와 통일) */}
+          <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-3xl p-6 border-3 border-orange-300 shadow-md">
             <div className="flex items-center gap-3 mb-4">
-              <Nut className="w-7 h-7 text-blue-600" />
+              <Nut className="w-7 h-7 text-orange-600" />
               <span className="text-base font-bold text-gray-800">지방</span>
             </div>
             <div className="flex items-baseline gap-2 mb-3">
               <span className="text-4xl font-bold text-gray-900">{displayFat}g</span>
               <span className="text-base font-medium text-gray-600">/ {targetFat}g</span>
             </div>
-            <div className="bg-blue-200 rounded-full h-3 overflow-hidden">
+            <div className="bg-orange-200 rounded-full h-3 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full rounded-full transition-all duration-300"
+                className="bg-gradient-to-r from-orange-500 to-amber-500 h-full rounded-full transition-all duration-300"
                 style={{ width: `${fatPercentage}%` }}
               />
             </div>
@@ -429,7 +429,7 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
       {/* Health Tips Auto Carousel - Enhanced text */}
       <div className="px-6 py-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">알아두면 좋은 식습관 정보</h2>
+          <h2 className="text-xl font-bold text-gray-900">알아두면 좋은 식습관 정보</h2>
           <div className="flex gap-1.5">
             {healthTips.map((_, index) => (
               <div

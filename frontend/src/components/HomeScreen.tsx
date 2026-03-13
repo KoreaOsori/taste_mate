@@ -155,8 +155,8 @@ export function HomeScreen({ userProfile, onNavigate, todaysMeals, setTodaysMeal
       <div className="px-6 -mt-16 mb-6">
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-xl p-4 shadow-sm">
-            <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-lg mb-2 mx-auto">
-              <Activity className="w-5 h-5 text-red-600" />
+            <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-lg mb-2 mx-auto">
+              <Activity className="w-5 h-5 text-blue-600" />
             </div>
             <p className="text-xs text-gray-600 text-center mb-1">단백질</p>
             <p className="text-lg font-bold text-center">{totalProtein}g</p>

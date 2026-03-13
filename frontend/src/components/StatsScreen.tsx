@@ -137,7 +137,7 @@ export function StatsScreen({ userProfile }: StatsScreenProps) {
                 <span className="font-medium text-gray-900">65g / 80g</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-red-500 h-2 rounded-full" style={{ width: '81%' }}></div>
+                <div className="bg-blue-500 h-2 rounded-full" style={{ width: '81%' }}></div>
               </div>
             </div>
 

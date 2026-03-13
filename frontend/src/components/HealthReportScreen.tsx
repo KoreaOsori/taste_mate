@@ -207,8 +207,8 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h2 className="text-lg font-bold text-gray-900 mb-4">영양소 분석</h2>
             <div className="space-y-4">
-              {/* Protein */}
-              <div>
+              {/* Protein - 파란색 (캘린더 뷰와 통일) */}
+              <div className="[&_[data-slot=progress-indicator]]:bg-blue-500">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-600">단백질</span>
                   <span className="font-bold text-gray-900">{proteinAverage}g / {targetProtein}g</span>
@@ -219,8 +219,8 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                 />
               </div>
 
-              {/* Carbs */}
-              <div>
+              {/* Carbs - 노란색 (캘린더 뷰와 통일) */}
+              <div className="[&_[data-slot=progress-indicator]]:bg-yellow-500">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-600">탄수화물</span>
                   <span className="font-bold text-gray-900">{carbsAverage}g / {targetCarbs}g</span>
@@ -231,8 +231,8 @@ export function HealthReportScreen({ userProfile, onBack }: HealthReportScreenPr
                 />
               </div>
 
-              {/* Fat */}
-              <div>
+              {/* Fat - 주황색 (캘린더 뷰와 통일) */}
+              <div className="[&_[data-slot=progress-indicator]]:bg-orange-500">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-600">지방</span>
                   <span className="font-bold text-gray-900">{fatAverage}g / {targetFat}g</span>
