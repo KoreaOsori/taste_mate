@@ -12,7 +12,7 @@ import { HealthReportScreen } from './components/HealthReportScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { RestaurantRecommendationScreenNew } from './components/RestaurantRecommendationScreenNew';
 import { FoodFarmScreen } from './components/FoodFarmScreen';
-import { Home, Calendar, Users, PlusCircle, Utensils, User } from 'lucide-react';
+import { Home, Calendar, Users, PlusCircle, Utensils, User, Bell, BellOff, Power, PowerOff } from 'lucide-react';
 import { profileService, recommendService } from './api/apiClient';
 
 export type Screen = 'login' | 'signup' | 'location' | 'onboarding' | 'home' | 'chat' | 'community' | 'meal-log' | 'calendar' | 'health-report' | 'profile' | 'restaurant' | 'foodfarm';
@@ -30,6 +30,12 @@ export interface UserProfile {
   breakfast_time: string;
   lunch_time: string;
   dinner_time: string;
+  breakfast_active: boolean;
+  lunch_active: boolean;
+  dinner_active: boolean;
+  breakfast_notify: boolean;
+  lunch_notify: boolean;
+  dinner_notify: boolean;
   activity_level: 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
   goal: 'lose' | 'balanced' | 'gain';
   preferred_categories: string[];
@@ -100,6 +106,7 @@ export default function App() {
   useEffect(() => {
     // Initial session check
     const initAuth = async () => {
+<<<<<<< HEAD
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
@@ -111,6 +118,34 @@ export default function App() {
       } catch (e) {
         console.error('Init auth error:', e);
         setCurrentScreen('login');
+=======
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await fetchUserProfile(session.user.id);
+      } else {
+        // 세션이 없을 경우 로컬 스토리지에서 게스트 정보 확인
+        const savedGuest = localStorage.getItem('tastemate_guestProfile');
+        if (savedGuest) {
+          try {
+            const guestData = JSON.parse(savedGuest);
+            console.log('Restoring guest session:', guestData);
+            setUserProfile(guestData);
+            // 게스트의 경우 저장된 화면이 있으면 이동, 아니면 홈
+            const savedScreen = localStorage.getItem('tastemate_currentScreen');
+            if (savedScreen && savedScreen !== 'login' && savedScreen !== 'signup') {
+              setCurrentScreen(savedScreen as Screen);
+            } else {
+              setCurrentScreen('home');
+            }
+          } catch (e) {
+            console.error('Failed to parse saved guest profile:', e);
+            setCurrentScreen('login');
+          }
+        } else {
+          // 세션도 게스트 정보도 없으면 로그인 화면으로
+          setCurrentScreen('login');
+        }
+>>>>>>> origin/Sign_up_Logic
         setIsLoading(false);
       }
     };
@@ -249,6 +284,8 @@ export default function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('tastemate_userId');
+    localStorage.removeItem('tastemate_guestProfile');
+    localStorage.removeItem('tastemate_currentScreen');
     setUserProfile(null);
     setSignupData(null);
     setUserLocation(null);
@@ -281,12 +318,19 @@ export default function App() {
       breakfast_time: '08:00',
       lunch_time: '12:00',
       dinner_time: '18:00',
+      breakfast_active: true,
+      lunch_active: true,
+      dinner_active: true,
+      breakfast_notify: true,
+      lunch_notify: true,
+      dinner_notify: true,
       activity_level: 'moderate',
       goal: 'balanced',
       preferred_categories: ['한식', '일식', '중식', '양식'],
       location: '서울시 강남구',
     };
     setUserProfile(guestProfile);
+    localStorage.setItem('tastemate_guestProfile', JSON.stringify(guestProfile));
     setCurrentScreen('home');
   };
 
