@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { UserProfile, Meal, Screen } from '../App';
-import { MapPin, Flame, Apple, Droplet, Zap, ChevronRight, Sparkles, Users } from 'lucide-react';
+import { MapPin, Flame, Apple, Droplet, Zap, ChevronRight, Sparkles, Users, Egg, Wheat, Nut } from 'lucide-react';
 
 interface DashboardHomeProps {
   userProfile: UserProfile;
@@ -65,6 +65,11 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
   const todayProtein = todaysMeals.reduce((sum, meal) => sum + meal.protein, 0);
   const todayCarbs = todaysMeals.reduce((sum, meal) => sum + meal.carbs, 0);
   const todayFat = todaysMeals.reduce((sum, meal) => sum + meal.fat, 0);
+  // 메인 표시용: 소수 깔끔하게 (17.7000... → 17.7)
+  const displayCalories = Math.round(todayCalories);
+  const displayProtein = Math.round(todayProtein * 10) / 10;
+  const displayCarbs = Math.round(todayCarbs * 10) / 10;
+  const displayFat = Math.round(todayFat * 10) / 10;
 
   // Calculate target macros based on goal
   const targetProtein = userProfile.goal === 'lose' ? 120 : userProfile.goal === 'gain' ? 150 : 100;
@@ -262,14 +267,14 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
           </div>
         </div>
         <div className="grid grid-cols-2 gap-5">
-          {/* Calories - Enhanced readability */}
+          {/* Calories */}
           <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-3xl p-6 border-3 border-orange-300 shadow-md">
             <div className="flex items-center gap-3 mb-4">
               <Flame className="w-7 h-7 text-orange-600" />
               <span className="text-base font-bold text-gray-800">칼로리</span>
             </div>
             <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-gray-900">{todayCalories}</span>
+              <span className="text-4xl font-bold text-gray-900">{displayCalories}</span>
               <span className="text-base font-medium text-gray-600">/ {userProfile.target_calories}</span>
             </div>
             <div className="bg-orange-200 rounded-full h-3 overflow-hidden">
@@ -280,14 +285,14 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
             </div>
           </div>
 
-          {/* Protein - Enhanced readability */}
+          {/* Protein */}
           <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-6 border-3 border-amber-300 shadow-md">
             <div className="flex items-center gap-3 mb-4">
-              <Zap className="w-7 h-7 text-amber-700" />
+              <Egg className="w-7 h-7 text-amber-700" />
               <span className="text-base font-bold text-gray-800">단백질</span>
             </div>
             <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-gray-900">{todayProtein}g</span>
+              <span className="text-4xl font-bold text-gray-900">{displayProtein}g</span>
               <span className="text-base font-medium text-gray-600">/ {targetProtein}g</span>
             </div>
             <div className="bg-amber-200 rounded-full h-3 overflow-hidden">
@@ -298,14 +303,14 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
             </div>
           </div>
 
-          {/* Carbs - Enhanced readability */}
+          {/* Carbs */}
           <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-3xl p-6 border-3 border-yellow-300 shadow-md">
             <div className="flex items-center gap-3 mb-4">
-              <Apple className="w-7 h-7 text-yellow-700" />
+              <Wheat className="w-7 h-7 text-yellow-700" />
               <span className="text-base font-bold text-gray-800">탄수화물</span>
             </div>
             <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-gray-900">{todayCarbs}g</span>
+              <span className="text-4xl font-bold text-gray-900">{displayCarbs}g</span>
               <span className="text-base font-medium text-gray-600">/ {targetCarbs}g</span>
             </div>
             <div className="bg-yellow-200 rounded-full h-3 overflow-hidden">
@@ -316,14 +321,14 @@ export function DashboardHome({ userProfile, onNavigate, todaysMeals }: Dashboar
             </div>
           </div>
 
-          {/* Fat - Enhanced readability */}
+          {/* Fat */}
           <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-3xl p-6 border-3 border-blue-300 shadow-md">
             <div className="flex items-center gap-3 mb-4">
-              <Droplet className="w-7 h-7 text-blue-600" />
+              <Nut className="w-7 h-7 text-blue-600" />
               <span className="text-base font-bold text-gray-800">지방</span>
             </div>
             <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-bold text-gray-900">{todayFat}g</span>
+              <span className="text-4xl font-bold text-gray-900">{displayFat}g</span>
               <span className="text-base font-medium text-gray-600">/ {targetFat}g</span>
             </div>
             <div className="bg-blue-200 rounded-full h-3 overflow-hidden">

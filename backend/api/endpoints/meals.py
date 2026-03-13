@@ -22,6 +22,22 @@ import uuid
 
 supabase = get_supabase_client()
 
+# 프론트 게스트와 동일. meals.user_id → profiles.user_id FK 만족을 위해 프로필 한 번 생성
+GUEST_USER_UUID = "00000000-0000-4000-8000-000000000001"
+
+
+def _ensure_guest_profile():
+    """게스트용 user_id가 profiles에 없으면 최소 행 삽입 (FK 만족)."""
+    try:
+        supabase.table("profiles").upsert({
+            "user_id": GUEST_USER_UUID,
+            "name": "게스트",
+            "target_calories": 2000,
+            "current_calories": 0,
+        }, on_conflict="user_id").execute()
+    except Exception as e:
+        print(f"[meals] ensure_guest_profile: {e}")
+
 @router.get("/", response_model=List[MealRecord])
 async def get_meals(
     user_id: UUID4,
@@ -61,6 +77,9 @@ async def create_meal(meal: MealRecord):
     meal_dict["user_id"] = str(meal_dict["user_id"])
     if meal_dict.get("timestamp"):
         meal_dict["timestamp"] = meal_dict["timestamp"].isoformat()
+
+    if meal_dict["user_id"] == GUEST_USER_UUID:
+        _ensure_guest_profile()
 
     response = supabase.table("meals").insert(meal_dict).execute()
     

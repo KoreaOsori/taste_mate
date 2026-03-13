@@ -78,22 +78,30 @@ export interface ChatMessage {
     timestamp: string;
 }
 
+/** 게스트는 DB에 UUID가 없으므로, 식사 API 호출 시 이 고정 UUID v4 사용 */
+const GUEST_USER_UUID = '00000000-0000-4000-8000-000000000001';
+
+function mealUserId(userId: string): string {
+    return userId === 'guest' ? GUEST_USER_UUID : userId;
+}
+
 export const mealService = {
     getMeals: async (userId: string, date?: string) => {
         const response = await apiClient.get<MealRecord[]>('/meals/', {
-            params: { user_id: userId, date },
+            params: { user_id: mealUserId(userId), date },
         });
         return response.data;
     },
     /** 해당 월 전체 식사 조회 (캘린더에 '데이터 있는 날' 표시용) */
     getMealsForMonth: async (userId: string, year: number, month: number) => {
         const response = await apiClient.get<MealRecord[]>('/meals/', {
-            params: { user_id: userId, year, month },
+            params: { user_id: mealUserId(userId), year, month },
         });
         return response.data;
     },
     createMeal: async (meal: MealRecord) => {
-        const response = await apiClient.post<MealRecord>('/meals/', meal);
+        const payload = { ...meal, user_id: mealUserId(meal.user_id) };
+        const response = await apiClient.post<MealRecord>('/meals/', payload);
         return response.data;
     },
 };

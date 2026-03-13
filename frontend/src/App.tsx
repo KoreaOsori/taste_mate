@@ -13,7 +13,7 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { RestaurantRecommendationScreenNew } from './components/RestaurantRecommendationScreenNew';
 import { FoodFarmScreen } from './components/FoodFarmScreen';
 import { Home, Calendar, Users, PlusCircle, Utensils, User, Bell, BellOff, Power, PowerOff } from 'lucide-react';
-import { profileService, recommendService } from './api/apiClient';
+import { profileService, recommendService, mealService } from './api/apiClient';
 
 export type Screen = 'login' | 'signup' | 'location' | 'onboarding' | 'home' | 'chat' | 'community' | 'meal-log' | 'calendar' | 'health-report' | 'profile' | 'restaurant' | 'foodfarm';
 
@@ -160,6 +160,28 @@ export default function App() {
       localStorage.setItem('tastemate_currentScreen', currentScreen);
     }
   }, [currentScreen]);
+
+  // 홈 칼로리 = 오늘 기준. 앱 로드·홈 진입 시 오늘 식사 조회해 todaysMeals 반영
+  useEffect(() => {
+    if (!userProfile?.user_id || currentScreen !== 'home') return;
+    const today = new Date().toISOString().split('T')[0];
+    mealService.getMeals(userProfile.user_id, today).then((meals: any[]) => {
+      const mapped: Meal[] = (meals || []).map((m: any) => ({
+        id: m.id || String(Math.random()),
+        type: m.type,
+        foodName: m.food_name ?? '',
+        calories: m.calories ?? 0,
+        protein: m.protein ?? 0,
+        carbs: m.carbs ?? 0,
+        fat: m.fat ?? 0,
+        timestamp: m.timestamp,
+      }));
+      setTodaysMeals(mapped);
+    }).catch((err) => {
+      console.error('Failed to fetch today meals for home:', err);
+      setTodaysMeals([]);
+    });
+  }, [userProfile?.user_id, currentScreen]);
 
   // location_consent 상태 변화 감지 및 위치 추적 트리거
   useEffect(() => {

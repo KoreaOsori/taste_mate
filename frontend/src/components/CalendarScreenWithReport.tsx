@@ -363,23 +363,32 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
                 </div>
 
                 {selectedDayData.meals.length > 0 && (() => {
-                  const totalProtein = selectedDayData.meals.reduce((s, m) => s + m.protein, 0);
-                  const totalCarbs = selectedDayData.meals.reduce((s, m) => s + m.carbs, 0);
-                  const totalFat = selectedDayData.meals.reduce((s, m) => s + m.fat, 0);
-                  const totalMacros = totalProtein + totalCarbs + totalFat;
-                  const proteinPercent = totalMacros ? Math.round((totalProtein / totalMacros) * 100) : 0;
-                  const carbsPercent = totalMacros ? Math.round((totalCarbs / totalMacros) * 100) : 0;
-                  const fatPercent = totalMacros ? Math.round((totalFat / totalMacros) * 100) : 0;
+                  const rawP = selectedDayData.meals.reduce((s, m) => s + m.protein, 0);
+                  const rawC = selectedDayData.meals.reduce((s, m) => s + m.carbs, 0);
+                  const rawF = selectedDayData.meals.reduce((s, m) => s + m.fat, 0);
+                  const totalMacros = rawP + rawC + rawF;
+                  const totalProtein = Math.round(rawP * 10) / 10;
+                  const totalCarbs = Math.round(rawC * 10) / 10;
+                  const totalFat = Math.round(rawF * 10) / 10;
+                  let proteinPercent = totalMacros ? Math.round((rawP / totalMacros) * 100) : 0;
+                  let carbsPercent = totalMacros ? Math.round((rawC / totalMacros) * 100) : 0;
+                  let fatPercent = totalMacros ? Math.round((rawF / totalMacros) * 100) : 0;
+                  const sum = proteinPercent + carbsPercent + fatPercent;
+                  if (sum !== 100 && sum > 0) {
+                    const diff = 100 - sum;
+                    if (diff > 0) fatPercent += diff;
+                    else if (diff < 0) fatPercent = Math.max(0, fatPercent + diff);
+                  }
                   return (
                     <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-4 mb-6 border border-green-100">
                       <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-green-600" />
                         영양소 균형
                       </h3>
-                      <div className="flex h-5 rounded-full overflow-hidden mb-3">
-                        <div className="bg-blue-500 flex items-center justify-center text-xs text-white" style={{ width: `${proteinPercent}%` }}>{proteinPercent > 12 && `${proteinPercent}%`}</div>
-                        <div className="bg-yellow-500 flex items-center justify-center text-xs text-white" style={{ width: `${carbsPercent}%` }}>{carbsPercent > 12 && `${carbsPercent}%`}</div>
-                        <div className="bg-orange-500 flex items-center justify-center text-xs text-white" style={{ width: `${fatPercent}%` }}>{fatPercent > 12 && `${fatPercent}%`}</div>
+                      <div className="flex h-6 rounded-full overflow-hidden mb-3 bg-gray-100">
+                        <div className="bg-blue-500 flex items-center justify-center text-xs text-white font-medium transition-all" style={{ width: `${proteinPercent}%` }}>{proteinPercent > 12 && `${proteinPercent}%`}</div>
+                        <div className="bg-yellow-500 flex items-center justify-center text-xs text-white font-medium transition-all" style={{ width: `${carbsPercent}%` }}>{carbsPercent > 12 && `${carbsPercent}%`}</div>
+                        <div className="bg-orange-500 flex items-center justify-center text-xs text-white font-medium transition-all" style={{ width: `${fatPercent}%` }}>{fatPercent > 12 && `${fatPercent}%`}</div>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-center text-sm">
                         <div><span className="text-gray-500">단백질</span> <span className="font-semibold text-gray-900">{totalProtein}g</span></div>
@@ -393,7 +402,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                     <UtensilsCrossed className="w-4 h-4 text-green-600" />
-                    그날 메뉴
+                    오늘 메뉴
                   </h3>
                   <Button size="sm" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => setShowAddMealDialog(true)}>
                     <Plus className="w-4 h-4 mr-1" />
