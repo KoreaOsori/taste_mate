@@ -102,6 +102,7 @@ export default function App() {
   const [signupData, setSignupData] = useState<{ userId: string; email: string; name: string } | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [calendarInitialDate, setCalendarInitialDate] = useState<string | null>(null);
 
   useEffect(() => {
     // Initial session check
@@ -419,13 +420,22 @@ export default function App() {
           <RestaurantRecommendationScreenNew
             userProfile={userProfile}
             userLocation={userLocation}
+            onNavigate={setCurrentScreen}
+            onLogMealToCalendar={(dateKey: string) => {
+              setCalendarInitialDate(dateKey);
+              setCurrentScreen('calendar');
+            }}
           />
         )}
         {currentScreen === 'foodfarm' && userProfile && (
           <FoodFarmScreen userProfile={userProfile} />
         )}
         {currentScreen === 'calendar' && userProfile && (
-          <CalendarScreenWithReport userProfile={userProfile} onNavigate={setCurrentScreen} />
+          <CalendarScreenWithReport
+            userProfile={userProfile}
+            onNavigate={setCurrentScreen}
+            initialSelectedDate={calendarInitialDate || undefined}
+          />
         )}
         {currentScreen === 'health-report' && userProfile && (
           <HealthReportScreen

@@ -11,6 +11,7 @@ import { mealService } from '../api/apiClient';
 interface CalendarScreenProps {
   userProfile: UserProfile;
   onNavigate: (screen: Screen) => void;
+  initialSelectedDate?: string;
 }
 
 interface DayData {
@@ -19,9 +20,9 @@ interface DayData {
   meals: Meal[];
 }
 
-export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarScreenProps) {
+export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelectedDate }: CalendarScreenProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(initialSelectedDate ?? null);
   const [showAddMealDialog, setShowAddMealDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [newMeal, setNewMeal] = useState({
@@ -34,7 +35,14 @@ export function CalendarScreenWithReport({ userProfile, onNavigate }: CalendarSc
   });
   const [calendarData, setCalendarData] = useState<Record<string, DayData>>({});
 
-  // Fetch meals when month changes or on initial mount
+  // Prop에서 초기 선택 날짜가 바뀌면 동기화
+  useEffect(() => {
+    if (initialSelectedDate) {
+      setSelectedDate(initialSelectedDate);
+    }
+  }, [initialSelectedDate]);
+
+  // Fetch meals when selected day changes or on initial mount
   useEffect(() => {
     const fetchMonthMeals = async () => {
       setIsLoading(true);

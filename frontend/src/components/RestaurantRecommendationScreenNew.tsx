@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { UserProfile } from '../App';
+import { UserProfile, Screen } from '../App';
 import { MapPin, Star, ExternalLink, Check, ChevronLeft, ChevronRight, RefreshCw, Navigation, Car, MapPinned, ArrowRight, Sparkles, Zap, MessageCircle, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { RecommendationLoadingScreen } from './RecommendationLoadingScreen';
 import { FeedbackModal } from './FeedbackModal';
 import { RestaurantRecommendationCardView } from './RestaurantRecommendationCardView';
-import { recommendService } from '../api/apiClient';
+import { recommendService, mealService } from '../api/apiClient';
 
 const FOOD_CATEGORIES = [
   { id: 'korean', label: '한식', emoji: '🍚' },
@@ -25,6 +25,8 @@ const FOOD_CATEGORIES = [
 interface RestaurantRecommendationScreenNewProps {
   userProfile: UserProfile;
   userLocation?: { latitude: number; longitude: number } | null;
+  onNavigate: (screen: Screen) => void;
+  onLogMealToCalendar?: (dateKey: string) => void;
 }
 
 interface Restaurant {
@@ -95,7 +97,12 @@ const MOCK_RESTAURANTS: Restaurant[] = [
 
 type QuestionStep = 'initial' | 'howMode' | 'dessertCategory' | 'emotion' | 'companion' | 'category' | 'preference' | 'budget' | 'loading' | 'result';
 
-export function RestaurantRecommendationScreenNew({ userProfile, userLocation }: RestaurantRecommendationScreenNewProps) {
+export function RestaurantRecommendationScreenNew({
+  userProfile,
+  userLocation,
+  onNavigate,
+  onLogMealToCalendar,
+}: RestaurantRecommendationScreenNewProps) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -275,10 +282,45 @@ export function RestaurantRecommendationScreenNew({ userProfile, userLocation }:
     setShowOrderModal(true);
   };
 
-  const handleConfirmOrder = (restaurant: Restaurant) => {
+  const handleConfirmOrder = async (restaurant: Restaurant) => {
     setShowOrderModal(false);
-    setFeedbackRestaurant({ name: restaurant.name, menu: restaurant.signature });
-    setShowFeedbackModal(true);
+
+    const now = new Date();
+    const hour = now.getHours();
+    let mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' = 'lunch';
+
+    if (hour < 11) mealType = 'breakfast';
+    else if (hour < 15) mealType = 'lunch';
+    else if (hour < 21) mealType = 'dinner';
+    else mealType = 'snack';
+
+    const dateKey = now.toISOString().split('T')[0];
+
+    try {
+      await mealService.createMeal({
+        user_id: userProfile.user_id,
+        type: mealType,
+        food_name: restaurant.signature || restaurant.name,
+        calories: restaurant.signatureCalories,
+        protein: restaurant.protein,
+        carbs: restaurant.carbs,
+        fat: restaurant.fat,
+        restaurant_link: restaurant.naverLink,
+        timestamp: now.toISOString(),
+      } as any);
+    } catch (error) {
+      console.error('Failed to log meal from recommendation:', error);
+    } finally {
+      // 캘린더로 이동하여 방금 기록한 날짜를 바로 보여주기
+      if (onLogMealToCalendar) {
+        onLogMealToCalendar(dateKey);
+      } else {
+        onNavigate('calendar');
+      }
+
+      setFeedbackRestaurant({ name: restaurant.name, menu: restaurant.signature });
+      setShowFeedbackModal(true);
+    }
   };
 
   // 1. 무엇을 추천해드릴까요? – 메인 / 사이드 / 커피·디저트
