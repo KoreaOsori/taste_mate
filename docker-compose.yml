@@ -10,6 +10,9 @@ services:
     env_file:
       - ./backend/.env
     restart: always
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   frontend:
     build:
@@ -23,6 +26,10 @@ services:
       - backend
     env_file:
       - ./frontend/.env
+    environment:
+      # 프론트 컨테이너가 /api 요청을 백엔드 서비스로 프록시 (브라우저는 같은 출처로만 요청)
+      - VITE_PROXY_TARGET=http://backend:8000
+      - VITE_USE_PROXY=true
     restart: always
 
 networks:
