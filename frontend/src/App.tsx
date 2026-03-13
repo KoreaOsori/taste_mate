@@ -78,11 +78,8 @@ export interface Comment {
 import { supabase } from './utils/supabaseClient';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
-    const saved = localStorage.getItem('tastemate_currentScreen');
-    if (saved) return saved as Screen;
-    return 'login';
-  });
+  // 첫 화면은 항상 로그인. 세션 확인 후 fetchUserProfile에서 저장된 화면으로 복원
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<Meal[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(() => {
@@ -103,10 +100,17 @@ export default function App() {
   useEffect(() => {
     // Initial session check
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await fetchUserProfile(session.user.id);
-      } else {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await fetchUserProfile(session.user.id);
+        } else {
+          setCurrentScreen('login');
+          setIsLoading(false);
+        }
+      } catch (e) {
+        console.error('Init auth error:', e);
+        setCurrentScreen('login');
         setIsLoading(false);
       }
     };

@@ -13,21 +13,6 @@ interface OnboardingScreenProps {
   userName?: string;
 }
 
-const foodCategories = [
-  { id: 'korean', label: '한식', emoji: '🍚' },
-  { id: 'chinese', label: '중식', emoji: '🥟' },
-  { id: 'japanese', label: '일식', emoji: '🍱' },
-  { id: 'western', label: '양식', emoji: '🍝' },
-  { id: 'fast-food', label: '패스트푸드', emoji: '🍔' },
-  { id: 'cafe', label: '카페/디저트', emoji: '☕' },
-  { id: 'asian', label: '아시안', emoji: '🍜' },
-  { id: 'bunsik', label: '분식', emoji: '🍢' },
-  { id: 'chicken', label: '치킨', emoji: '🍗' },
-  { id: 'pizza', label: '피자', emoji: '🍕' },
-  { id: 'salad', label: '샐러드', emoji: '🥗' },
-  { id: 'healthy', label: '건강식', emoji: '🥙' },
-];
-
 export function OnboardingScreenNew({ onComplete, userId, userName = '' }: OnboardingScreenProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,26 +25,11 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
     breakfastTime: '08:00',
     lunchTime: '12:00',
     dinnerTime: '18:00',
-    preferredCategories: [] as string[],
     dislikedFoods: '',
     healthGoal: 'balanced' as 'lose' | 'balanced' | 'gain',
     activityLevel: 'moderate' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active',
     locationConsent: true,
   });
-
-  const toggleCategory = (categoryId: string) => {
-    if (formData.preferredCategories.includes(categoryId)) {
-      setFormData({
-        ...formData,
-        preferredCategories: formData.preferredCategories.filter(id => id !== categoryId),
-      });
-    } else {
-      setFormData({
-        ...formData,
-        preferredCategories: [...formData.preferredCategories, categoryId],
-      });
-    }
-  };
 
   const calculateTargetCalories = () => {
     const weightNum = parseInt(formData.weight) || 70;
@@ -110,7 +80,7 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
       dinner_time: formData.dinnerTime,
       activity_level: formData.activityLevel,
       goal: formData.healthGoal,
-      preferred_categories: formData.preferredCategories,
+      preferred_categories: [], // 추천 화면에서 선택하도록 함
       disliked_foods: formData.dislikedFoods.split(',').map(s => s.trim()).filter(s => s !== ''),
       location: '',
       location_consent: formData.locationConsent,
@@ -276,41 +246,20 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
           {step === 3 && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <h1 className="text-2xl font-bold text-gray-900">식사 취향 및 제한</h1>
-                <p className="text-sm text-gray-500">좋아하는 음식과 피하고 싶은 음식을 알려주세요 (선택)</p>
+                <h1 className="text-2xl font-bold text-gray-900">식사 제한</h1>
+                <p className="text-sm text-gray-500">피하고 싶은 음식이나 알레르기 정보를 알려주세요 (선택)</p>
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  <Label className="text-gray-900 font-bold">선호하는 음식 (복수 선택)</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {foodCategories.map((category) => (
-                      <button
-                        key={category.id}
-                        onClick={() => toggleCategory(category.id)}
-                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${formData.preferredCategories.includes(category.id)
-                          ? 'border-green-600 bg-green-50 shadow-sm'
-                          : 'border-gray-100 hover:border-green-200 bg-white'
-                          }`}
-                      >
-                        <span className="text-xl">{category.emoji}</span>
-                        <span className="text-[11px] font-bold text-gray-700">{category.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="disliked" className="text-gray-900 font-bold">기피하거나 못 먹는 음식</Label>
-                  <Input
-                    id="disliked"
-                    value={formData.dislikedFoods}
-                    onChange={(e) => setFormData({ ...formData, dislikedFoods: e.target.value })}
-                    placeholder="예: 오이, 가지, 견과류 (쉼표로 구분)"
-                    className="h-12 border-gray-200"
-                  />
-                  <p className="text-xs text-gray-400">추천 알고리즘에서 최대한 제외해 드릴게요.</p>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="disliked" className="text-gray-900 font-bold">기피하거나 못 먹는 음식</Label>
+                <Input
+                  id="disliked"
+                  value={formData.dislikedFoods}
+                  onChange={(e) => setFormData({ ...formData, dislikedFoods: e.target.value })}
+                  placeholder="예: 오이, 가지, 견과류 (쉼표로 구분)"
+                  className="h-12 border-gray-200"
+                />
+                <p className="text-xs text-gray-400">추천 알고리즘에서 최대한 제외해 드릴게요.</p>
               </div>
             </div>
           )}
