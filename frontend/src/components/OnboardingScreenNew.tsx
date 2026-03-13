@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { UserProfile } from '../App';
-import { ArrowRight, Clock, Utensils, Loader2 } from 'lucide-react';
+import { ArrowRight, Clock, Utensils, Loader2, Bell, BellOff, Power, PowerOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient';
 import { profileService } from '../api/apiClient';
 
@@ -40,12 +41,26 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
     breakfastTime: '08:00',
     lunchTime: '12:00',
     dinnerTime: '18:00',
+    breakfastActive: true,
+    lunchActive: true,
+    dinnerActive: true,
+    breakfastNotify: true,
+    lunchNotify: true,
+    dinnerNotify: true,
     preferredCategories: [] as string[],
     dislikedFoods: '',
     healthGoal: 'balanced' as 'lose' | 'balanced' | 'gain',
     activityLevel: 'moderate' as 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active',
     locationConsent: true,
   });
+
+  const activityMultipliers: Record<string, number> = {
+    sedentary: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    active: 1.725,
+    'very-active': 1.9,
+  };
 
   const toggleCategory = (categoryId: string) => {
     if (formData.preferredCategories.includes(categoryId)) {
@@ -74,14 +89,6 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
       bmr = 447.6 + (9.2 * weightNum) + (3.1 * heightNum) - (4.3 * ageNum);
     }
 
-    const activityMultipliers = {
-      sedentary: 1.2,
-      light: 1.375,
-      moderate: 1.55,
-      active: 1.725,
-      'very-active': 1.9,
-    };
-
     let tdee = bmr * activityMultipliers[formData.activityLevel];
 
     if (formData.healthGoal === 'lose') tdee -= 500;
@@ -108,6 +115,12 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
       breakfast_time: formData.breakfastTime,
       lunch_time: formData.lunchTime,
       dinner_time: formData.dinnerTime,
+      breakfast_active: formData.breakfastActive,
+      lunch_active: formData.lunchActive,
+      dinner_active: formData.dinnerActive,
+      breakfast_notify: formData.breakfastNotify,
+      lunch_notify: formData.lunchNotify,
+      dinner_notify: formData.dinnerNotify,
       activity_level: formData.activityLevel,
       goal: formData.healthGoal,
       preferred_categories: formData.preferredCategories,
@@ -251,20 +264,39 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
 
               <div className="space-y-3">
                 {[
-                  { label: '아침 식사', id: 'breakfastTime', icon: '🌅' },
-                  { label: '점심 식사', id: 'lunchTime', icon: '☀️' },
-                  { label: '저녁 식사', id: 'dinnerTime', icon: '🌙' },
+                  { label: '아침 식사', id: 'breakfastTime', activeId: 'breakfastActive', notifyId: 'breakfastNotify', icon: '🌅' },
+                  { label: '점심 식사', id: 'lunchTime', activeId: 'lunchActive', notifyId: 'lunchNotify', icon: '☀️' },
+                  { label: '저녁 식사', id: 'dinnerTime', activeId: 'dinnerActive', notifyId: 'dinnerNotify', icon: '🌙' },
                 ].map((meal) => (
-                  <div key={meal.id} className="p-4 bg-gray-50 rounded-xl flex items-center gap-4">
+                  <div key={meal.id} className={`p-4 rounded-xl flex items-center gap-4 transition-all ${(formData as any)[meal.activeId] ? 'bg-gray-50 border border-gray-100' : 'bg-gray-100/50 opacity-60 border border-transparent blur-[0.3px]'}`}>
                     <span className="text-2xl">{meal.icon}</span>
                     <div className="flex-1">
-                      <Label htmlFor={meal.id} className="text-sm font-semibold text-gray-700">{meal.label}</Label>
+                      <div className="flex items-center justify-between mb-1">
+                        <Label htmlFor={meal.id} className="text-sm font-semibold text-gray-700">{meal.label}</Label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setFormData({ ...formData, [meal.notifyId]: !(formData as any)[meal.notifyId] })}
+                            className={`p-1.5 rounded-full transition-colors ${(formData as any)[meal.notifyId] ? 'text-green-600 bg-green-100' : 'text-gray-400 bg-gray-200'}`}
+                            title="알림 설정"
+                          >
+                            {(formData as any)[meal.notifyId] ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                          </button>
+                          <button
+                            onClick={() => setFormData({ ...formData, [meal.activeId]: !(formData as any)[meal.activeId] })}
+                            className={`p-1.5 rounded-full transition-colors ${(formData as any)[meal.activeId] ? 'text-green-600 bg-green-100' : 'text-gray-400 bg-gray-200'}`}
+                            title="식사 여부"
+                          >
+                            {(formData as any)[meal.activeId] ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
                       <Input
                         id={meal.id}
                         type="time"
+                        disabled={!(formData as any)[meal.activeId]}
                         value={(formData as any)[meal.id]}
                         onChange={(e) => setFormData({ ...formData, [meal.id]: e.target.value })}
-                        className="border-none bg-transparent h-8 p-0 font-bold text-lg focus-visible:ring-0"
+                        className="border-none bg-transparent h-8 p-0 font-bold text-lg focus-visible:ring-0 disabled:text-gray-400"
                       />
                     </div>
                   </div>
@@ -276,40 +308,35 @@ export function OnboardingScreenNew({ onComplete, userId, userName = '' }: Onboa
           {step === 3 && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <h1 className="text-2xl font-bold text-gray-900">식사 취향 및 제한</h1>
-                <p className="text-sm text-gray-500">좋아하는 음식과 피하고 싶은 음식을 알려주세요 (선택)</p>
+                <h1 className="text-2xl font-bold text-gray-900">식사 기피 및 제한</h1>
+                <p className="text-sm text-gray-500">먹지 못하는 음식과 피하고 싶은 음식을 알려주세요 (선택)</p>
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  <Label className="text-gray-900 font-bold">선호하는 음식 (복수 선택)</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {foodCategories.map((category) => (
-                      <button
-                        key={category.id}
-                        onClick={() => toggleCategory(category.id)}
-                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${formData.preferredCategories.includes(category.id)
-                          ? 'border-green-600 bg-green-50 shadow-sm'
-                          : 'border-gray-100 hover:border-green-200 bg-white'
-                          }`}
-                      >
-                        <span className="text-xl">{category.emoji}</span>
-                        <span className="text-[11px] font-bold text-gray-700">{category.label}</span>
-                      </button>
-                    ))}
-                  </div>
+              <div className="space-y-6">
+                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                  <p className="text-sm text-blue-800 leading-relaxed font-medium">
+                    🙌 <strong>알려주세요!</strong><br />
+                    여기서는 추천에서 <strong>꼭 제외해야 할 음식</strong>을 알려주세요.
+                    <br />
+                    알레르기, 기피하는 음식, 선호하지 않는 음식들을 적어 주세요.
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="disliked" className="text-gray-900 font-bold">기피하거나 못 먹는 음식</Label>
-                  <Input
-                    id="disliked"
-                    value={formData.dislikedFoods}
-                    onChange={(e) => setFormData({ ...formData, dislikedFoods: e.target.value })}
-                    placeholder="예: 오이, 가지, 견과류 (쉼표로 구분)"
-                    className="h-12 border-gray-200"
-                  />
-                  <p className="text-xs text-gray-400">추천 알고리즘에서 최대한 제외해 드릴게요.</p>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="disliked" className="text-gray-900 font-bold">기피하거나 못 먹는 음식 (제외용)</Label>
+                    <Textarea
+                      id="disliked"
+                      value={formData.dislikedFoods}
+                      onChange={(e) => setFormData({ ...formData, dislikedFoods: e.target.value })}
+                      placeholder="예: 오이, 가지, 견과류, 갑각류 알레르기 등 (쉼표로 구분)"
+                      className="min-h-[120px] border-gray-200 focus:ring-green-500 rounded-xl resize-none"
+                    />
+                    <p className="text-xs text-gray-400 leading-tight">
+                      작성해주신 음식은 추천 알고리즘에서 강력하게 제외됩니다.<br />
+                      특정 알레르기가 있다면 반드시 기재해 주세요.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

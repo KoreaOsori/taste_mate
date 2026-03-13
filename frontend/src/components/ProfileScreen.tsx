@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserProfile } from '../App';
-import { User, Settings, Bell, Lock, HelpCircle, LogOut, ChevronRight, Edit2, MapPin, Globe, Shield } from 'lucide-react';
+import { User, Settings, Bell, BellOff, Lock, HelpCircle, LogOut, ChevronRight, Edit2, MapPin, Globe, Shield, Power, PowerOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -25,6 +25,12 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
     breakfast_time: userProfile?.breakfast_time || '08:00',
     lunch_time: userProfile?.lunch_time || '12:00',
     dinner_time: userProfile?.dinner_time || '18:00',
+    breakfast_active: userProfile?.breakfast_active ?? true,
+    lunch_active: userProfile?.lunch_active ?? true,
+    dinner_active: userProfile?.dinner_active ?? true,
+    breakfast_notify: userProfile?.breakfast_notify ?? true,
+    lunch_notify: userProfile?.lunch_notify ?? true,
+    dinner_notify: userProfile?.dinner_notify ?? true,
   });
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [isLocationEnabled, setIsLocationEnabled] = useState(userProfile?.location_consent || false);
@@ -41,6 +47,12 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
         breakfast_time: userProfile.breakfast_time || '08:00',
         lunch_time: userProfile.lunch_time || '12:00',
         dinner_time: userProfile.dinner_time || '18:00',
+        breakfast_active: userProfile.breakfast_active ?? true,
+        lunch_active: userProfile.lunch_active ?? true,
+        dinner_active: userProfile.dinner_active ?? true,
+        breakfast_notify: userProfile.breakfast_notify ?? true,
+        lunch_notify: userProfile.lunch_notify ?? true,
+        dinner_notify: userProfile.dinner_notify ?? true,
       });
       setIsLocationEnabled(userProfile.location_consent || false);
     }
@@ -66,6 +78,12 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
       breakfast_time: formData.breakfast_time,
       lunch_time: formData.lunch_time,
       dinner_time: formData.dinner_time,
+      breakfast_active: formData.breakfast_active,
+      lunch_active: formData.lunch_active,
+      dinner_active: formData.dinner_active,
+      breakfast_notify: formData.breakfast_notify,
+      lunch_notify: formData.lunch_notify,
+      dinner_notify: formData.dinner_notify,
     };
 
     try {
@@ -215,13 +233,7 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
       <div className="px-4 pb-4">
         <h3 className="text-sm font-bold text-gray-900 mb-2">설정</h3>
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <button className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors">
-            <div className="flex items-center gap-2.5">
-              <Bell className="w-4 h-4 text-gray-600 flex-shrink-0" />
-              <span className="text-sm font-medium text-gray-900">알림 설정</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          </button>
+
           <button
             onClick={() => setShowLocationModal(true)}
             className="w-full p-3.5 flex items-center justify-between border-b border-gray-100 hover:bg-gray-50 transition-colors"
@@ -351,32 +363,50 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
               </div>
 
               <div>
-                <Label>식사 시간</Label>
-                <div className="grid grid-cols-3 gap-3 mt-2">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">아침</p>
-                    <Input
-                      type="time"
-                      value={formData.breakfast_time}
-                      onChange={(e) => setFormData({ ...formData, breakfast_time: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">점심</p>
-                    <Input
-                      type="time"
-                      value={formData.lunch_time}
-                      onChange={(e) => setFormData({ ...formData, lunch_time: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">저녁</p>
-                    <Input
-                      type="time"
-                      value={formData.dinner_time}
-                      onChange={(e) => setFormData({ ...formData, dinner_time: e.target.value })}
-                    />
-                  </div>
+                <Label>식사 시간 및 설정</Label>
+                <div className="space-y-3 mt-2">
+                  {[
+                    { id: 'breakfast', label: '아침', time: 'breakfast_time', active: 'breakfast_active', notify: 'breakfast_notify' },
+                    { id: 'lunch', label: '점심', time: 'lunch_time', active: 'lunch_active', notify: 'lunch_notify' },
+                    { id: 'dinner', label: '저녁', time: 'dinner_time', active: 'dinner_active', notify: 'dinner_notify' }
+                  ].map((meal) => (
+                    <div
+                      key={meal.id}
+                      className={`flex items-center gap-4 p-3 rounded-2xl border transition-all ${formData[meal.active as keyof typeof formData]
+                        ? 'bg-white border-green-100 shadow-sm'
+                        : 'bg-gray-50 border-gray-100 opacity-60'
+                        }`}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-bold text-gray-900">{meal.label} 식사</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setFormData({ ...formData, [meal.active]: !formData[meal.active as keyof typeof formData] })}
+                              className={`p-2 rounded-xl transition-colors ${formData[meal.active as keyof typeof formData] ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'
+                                }`}
+                            >
+                              {formData[meal.active as keyof typeof formData] ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={() => setFormData({ ...formData, [meal.notify]: !formData[meal.notify as keyof typeof formData] })}
+                              className={`p-2 rounded-xl transition-colors ${formData[meal.notify as keyof typeof formData] ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                                }`}
+                            >
+                              {formData[meal.notify as keyof typeof formData] ? <Bell className="w-4 h-4" /> : <Bell className="w-4 h-4 opacity-50" />}
+                            </button>
+                          </div>
+                        </div>
+                        <Input
+                          type="time"
+                          value={formData[meal.time as keyof typeof formData] as any}
+                          disabled={!formData[meal.active as keyof typeof formData]}
+                          onChange={(e) => setFormData({ ...formData, [meal.time]: e.target.value })}
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -413,14 +443,16 @@ export function ProfileScreen({ userProfile, setUserProfile, onLogout }: Profile
                 실시간 위치 정보를 활용하여 주변의 최적화된 식당을 추천해 드립니다. 개인 정보는 안전하게 보호됩니다.
               </p>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl mb-6">
-                <span className="font-semibold text-gray-900">실시간 위치 정보 활용</span>
-                <button
+              <div className="mb-6">
+                <Button
                   onClick={() => handleLocationToggle(!isLocationEnabled)}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${isLocationEnabled ? 'bg-green-600' : 'bg-gray-300'}`}
+                  variant="outline"
+                  className="w-full h-14 rounded-2xl flex items-center justify-between px-6 transition-all bg-gray-50 text-gray-700 border-gray-100 hover:bg-gray-100"
                 >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isLocationEnabled ? 'left-7' : 'left-1'}`} />
-                </button>
+                  <span className="font-bold">실시간 위치 정보 활용</span>
+                  <div className={`w-12 h-6 rounded-full transition-all relative ${isLocationEnabled ? 'bg-green-600' : 'bg-gray-300'}`}>
+                  </div>
+                </Button>
               </div>
 
               <div className="flex gap-3">

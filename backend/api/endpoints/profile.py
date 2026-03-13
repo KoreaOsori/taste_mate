@@ -18,6 +18,12 @@ class UserProfile(BaseModel):
     breakfast_time: Optional[str] = None
     lunch_time: Optional[str] = None
     dinner_time: Optional[str] = None
+    breakfast_active: bool = True
+    lunch_active: bool = True
+    dinner_active: bool = True
+    breakfast_notify: bool = True
+    lunch_notify: bool = True
+    dinner_notify: bool = True
     activity_level: Optional[str] = None
     goal: Optional[str] = None
     preferred_categories: List[str] = []
