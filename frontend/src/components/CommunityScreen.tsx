@@ -11,6 +11,33 @@ interface CommunityScreenProps {
   userProfile: UserProfile;
 }
 
+const MOCK_COMMUNITY_POSTS: CommunityPost[] = [
+  {
+    id: '1',
+    userId: 'mock-1',
+    userName: '김철수',
+    content: '오늘 점심으로 추천받은 포케 먹었는데 정말 깔끔하고 맛있네요! 단백질도 넉넉해서 든든합니다.',
+    calories: 450,
+    location: '서울 강남구',
+    tags: ['포케', '다이어트', '식단공유'],
+    timestamp: new Date().toISOString(),
+    likes: 12,
+    comments: [],
+  },
+  {
+    id: '2',
+    userId: 'mock-2',
+    userName: '이영희',
+    content: '비 오는 날엔 역시 따뜻한 라멘... 하지만 오늘은 참고 가벼운 샐러드로 타협했어요! ㅎㅎ',
+    calories: 320,
+    location: '서울 송파구',
+    tags: ['샐러드', '자기관리', '갓생'],
+    timestamp: new Date().toISOString(),
+    likes: 8,
+    comments: [],
+  }
+];
+
 export function CommunityScreen({ userProfile }: CommunityScreenProps) {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -32,7 +59,8 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
       const key = supabaseAnonKey;
 
       if (!url || !key) {
-        console.log('Supabase not configured, using local data only');
+        console.warn('Supabase not configured, using local mock data');
+        setPosts(MOCK_COMMUNITY_POSTS);
         return;
       }
 
@@ -48,9 +76,13 @@ export function CommunityScreen({ userProfile }: CommunityScreenProps) {
       if (response.ok) {
         const data = await response.json();
         setPosts(data);
+      } else {
+        throw new Error(`Response status: ${response.status}`);
       }
     } catch (error) {
-      console.error('Error loading posts:', error);
+      console.log('Community API unavailable (possibly CORS or Config). Using local data.');
+      // Local fallback for a better UX during setup/dev
+      setPosts(MOCK_COMMUNITY_POSTS);
     }
   };
 

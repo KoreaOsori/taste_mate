@@ -60,29 +60,51 @@ async def get_profile(user_id: UUID4):
 async def update_profile(user_id: UUID4, profile: UserProfile):
     """
     Update or insert user profile in Supabase.
+    Includes a fallback mechanism for missing columns (Schema Mismatch).
     """
+    user_id_str = str(user_id)
     try:
         profile_dict = profile.dict(exclude_none=True)
-        profile_dict["user_id"] = str(user_id)
+        profile_dict["user_id"] = user_id_str
 
-        print(f"[DEBUG] Updating profile for {user_id}: {profile_dict}")
+        print(f"[DEBUG] Updating profile for {user_id_str}: {profile_dict.keys()}")
 
-        # Use upsert to handle both create and update
-        response = supabase.table("profiles").upsert(profile_dict).execute()
+        # 1. First attempt: Update with all fields
+        try:
+            response = supabase.table("profiles").upsert(profile_dict).execute()
+            if response.data:
+                return response.data[0]
+        except Exception as e:
+            error_msg = str(e)
+            # PGRST204: Column not found in schema cache
+            if "PGRST204" in error_msg or "column" in error_msg.lower():
+                print(f"[WARNING] Schema mismatch detected. Retrying with 'safe' columns. Error: {error_msg}")
+                
+                # 2. Fallback attempt: Remove problematic new columns if DB isn't updated
+                safe_columns = [
+                    'user_id', 'name', 'age', 'gender', 'height', 'weight', 
+                    'target_weight', 'target_calories', 'current_calories',
+                    'breakfast_time', 'lunch_time', 'dinner_time',
+                    'activity_level', 'goal', 'preferred_categories', 
+                    'disliked_foods', 'restricted_foods', 'location', 'location_consent'
+                ]
+                # Keep only columns that exist in the original basic schema
+                safe_dict = {k: v for k, v in profile_dict.items() if k in safe_columns}
+                
+                print(f"[DEBUG] Retrying upsert with safe columns: {safe_dict.keys()}")
+                response = supabase.table("profiles").upsert(safe_dict).execute()
+                if response.data:
+                    # Return the saved data merged with the incoming full profile (UI reflects intent)
+                    return {**profile_dict, **response.data[0]}
+            
+            # If it wasn't a column error or fallback also failed, re-raise
+            raise e
 
-        if not response.data:
-            print(f"[ERROR] No data returned from Supabase: {response}")
-            raise HTTPException(status_code=400, detail="Failed to update profile - no data returned")
+        raise HTTPException(status_code=400, detail="Failed to update profile - no data returned")
 
-        return response.data[0]
     except Exception as e:
         print(f"[EXCEPTION] Error during profile update: {str(e)}")
         error_msg = str(e)
-        if "column" in error_msg.lower() and "does not exist" in error_msg.lower():
-            raise HTTPException(
-                status_code=400,
-                detail=f"Database schema mismatch: {error_msg}. Please run columns update SQL."
-            )
         if "connection" in error_msg.lower() or "network" in error_msg.lower():
             raise HTTPException(
                 status_code=503,

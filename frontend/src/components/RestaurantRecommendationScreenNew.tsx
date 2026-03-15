@@ -235,6 +235,14 @@ export function RestaurantRecommendationScreenNew({
         setSelectedEmotion(value);
         setQuestionStep('category');
         break;
+      case 'category':
+        // If main dish, go to preference
+        setQuestionStep('preference');
+        break;
+      case 'preference':
+        // Go to companion after preference
+        setQuestionStep('companion');
+        break;
       case 'companion':
         setSelectedCompanion(value);
         setQuestionStep('budget');
@@ -324,27 +332,27 @@ export function RestaurantRecommendationScreenNew({
     }
   };
 
-  // 1. 무엇을 추천해드릴까요? – 메인 / 사이드 / 커피·디저트
+  // 1. 무엇을 추천해드릴까요? – 메인 / 커피·디저트
   if (questionStep === 'initial') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center px-5 pb-20">
         <div className="max-w-md w-full">
           <div className="text-center mb-6">
-            <p className="text-base font-bold text-gray-600 mb-2">1/7</p>
+            <p className="text-base font-bold text-gray-600 mb-2">1/{selectedMealType === '커피·디저트' ? '3' : '7'}</p>
             <div className="flex gap-1.5 justify-center">
-              {[1, 2, 3, 4, 5, 6, 7].map((s) => (
+              {[1, 2, 3, 4, 5, 6, 7].slice(0, selectedMealType === '커피·디저트' ? 3 : 7).map((s) => (
                 <div key={s} className={`h-1.5 rounded-full transition-all ${s === 1 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />
               ))}
             </div>
           </div>
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-3">무엇을 추천해드릴까요?</h1>
-            <p className="text-base text-gray-600">메인 요리부터 간단한 것까지</p>
+            <p className="text-base text-gray-600">식사부터 디저트까지 딱 맞춰서!</p>
           </div>
           <div className="space-y-3">
             {[
-              { emoji: '🍽️', text: '메인디쉬', desc: '든든한 한 끼' },
-              { emoji: '☕', text: '커피·디저트', desc: '카페·빵·케이크' },
+              { emoji: '🍽️', text: '메인디쉬', desc: '든든한 한 끼 식사' },
+              { emoji: '☕', text: '커피·디저트', desc: '카페, 빵, 케이크' },
             ].map((option) => (
               <button key={option.text} onClick={() => { setSelectedMealType(option.text); setQuestionStep('howMode'); }} className="w-full bg-white rounded-2xl p-5 shadow-md border-2 border-transparent hover:border-green-500 group">
                 <div className="flex items-center gap-4">
@@ -367,9 +375,9 @@ export function RestaurantRecommendationScreenNew({
         <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
         <div className="max-w-md mx-auto flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
           <div className="text-center mb-6">
-            <p className="text-base font-bold text-gray-600 mb-2">2/7</p>
+            <p className="text-base font-bold text-gray-600 mb-2">2/{selectedMealType === '커피·디저트' ? '3' : '7'}</p>
             <div className="flex gap-1.5 justify-center">
-              {[1, 2, 3, 4, 5, 6, 7].map((s) => (
+              {[1, 2, 3, 4, 5, 6, 7].slice(0, selectedMealType === '커피·디저트' ? 3 : 7).map((s) => (
                 <div key={s} className={`h-1.5 rounded-full transition-all ${s <= 2 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />
               ))}
             </div>
@@ -389,7 +397,7 @@ export function RestaurantRecommendationScreenNew({
             <button onClick={handleCustomRecommendation} className="w-full bg-white rounded-2xl p-6 shadow-md border-2 border-blue-500 group">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center"><MessageCircle className="w-7 h-7 text-white" /></div>
-                <div className="flex-1 text-left"><h3 className="text-lg font-bold text-gray-900 mb-1">상황에 맞는 음식 추천</h3><p className="text-sm text-gray-600">질문으로 알아보기</p></div>
+                <div className="flex-1 text-left"><h3 className="text-lg font-bold text-gray-900 mb-1">상황에 맞는 메뉴 추천</h3><p className="text-sm text-gray-600">질문으로 알아보기</p></div>
                 <ArrowRight className="w-6 h-6 text-blue-600" />
               </div>
             </button>
@@ -399,52 +407,46 @@ export function RestaurantRecommendationScreenNew({
     );
   }
 
-  // 3. 커피·디저트 – 어떤 게 땡기시나요? (빵/과자류, 음료, 차)
+  // 3-Dessert. 커피·디저트 – 유형 선택 (Option A/B)
   if (questionStep === 'dessertCategory') {
     const DESSERT_OPTIONS = [
-      { emoji: '🥐', text: '빵/과자류', desc: '빵, 케이크, 과자' },
-      { emoji: '🥤', text: '음료/차', desc: '커피, 주스, 스무디, 티, 라떼' },
+      { emoji: '🥤', text: '커피, 음료, 차', desc: '시원하고 따뜻한 마실 거리', value: '음료중심' },
+      { emoji: '🥐', text: '빵, 케이크, 과자', desc: '달콤하고 고소한 디저트류', value: '베이커리중심' },
     ];
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 px-5 pt-6 pb-20">
         <button onClick={handleBack} className="mb-4 p-2 hover:bg-white/50 rounded-lg"><ChevronLeft className="w-6 h-6 text-gray-700" /></button>
         <div className="max-w-md mx-auto">
           <div className="text-center mb-6">
-            <p className="text-base font-bold text-gray-600 mb-2">3/7</p>
+            <p className="text-base font-bold text-gray-600 mb-2">3/3</p>
             <div className="flex gap-1.5 justify-center">
-              {[1, 2, 3, 4, 5, 6, 7].map((s) => (
+              {[1, 2, 3].map((s) => (
                 <div key={s} className={`h-1.5 rounded-full transition-all ${s <= 3 ? 'w-8 bg-green-600' : 'w-6 bg-gray-300'}`} />
               ))}
             </div>
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2 text-center">어떤 게 땡기시나요?</h2>
-          <p className="text-sm text-gray-500 text-center mb-4">하나 골라주세요</p>
-          <div className="space-y-3 mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-3 text-center">어떤 것이 땡기시나요?</h2>
+          <p className="text-base text-gray-600 text-center mb-8">취향에 맞는 카페를 찾아드릴게요</p>
+          <div className="space-y-4">
             {DESSERT_OPTIONS.map((option) => (
               <button
-                key={option.text}
-                onClick={() => setSelectedDessertCategory(option.text)}
-                className={`w-full rounded-2xl p-5 shadow-md border-2 transition-all text-left flex items-center gap-4 ${selectedDessertCategory === option.text ? 'border-green-600 bg-green-50' : 'border-transparent bg-white hover:border-green-500 group'}`}
+                key={option.value}
+                onClick={() => {
+                  setSelectedDessertCategory(option.text);
+                  setQuestionStep('loading');
+                  setTimeout(() => generateRecommendations(false), 1500);
+                }}
+                className="w-full bg-white rounded-2xl p-6 shadow-md border-2 border-transparent hover:border-green-500 transition-all text-left flex items-center gap-5 group"
               >
-                <div className="text-4xl">{option.emoji}</div>
+                <div className="text-5xl">{option.emoji}</div>
                 <div className="flex-1">
-                  <p className="text-base font-bold text-gray-900">{option.text}</p>
+                  <p className="text-lg font-bold text-gray-900">{option.text}</p>
                   <p className="text-sm text-gray-600">{option.desc}</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-green-600" />
+                <ArrowRight className="w-6 h-6 text-gray-300 group-hover:text-green-600" />
               </button>
             ))}
           </div>
-          <Button
-            onClick={() => {
-              setQuestionStep('loading');
-              setTimeout(() => generateRecommendations(false), 1500);
-            }}
-            disabled={!selectedDessertCategory}
-            className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl disabled:opacity-50"
-          >
-            다음 <ArrowRight className="w-5 h-5 ml-1 inline" />
-          </Button>
         </div>
       </div>
     );
@@ -607,12 +609,29 @@ export function RestaurantRecommendationScreenNew({
   // Result Screen
   if (questionStep === 'result' && restaurants.length > 0) {
     return (
-      <>
+      <div 
+        className="flex flex-col w-full bg-white overflow-hidden shrink-0 relative"
+        style={{ height: '70vh', minHeight: '530px', border: '1px solid transparent' }}
+      >
         <RestaurantRecommendationCardView
           restaurants={restaurants}
           onSelectRestaurant={handleOrderClick}
           onShowFeedback={(r) => { setFeedbackRestaurant(r); setShowFeedbackModal(true); }}
           onRefresh={() => generateRecommendations(isQuickMode)}
+          onLike={async (r) => {
+            try {
+              await recommendService.recordInterest(userProfile.user_id, r.name, 'like');
+            } catch (err) {
+              console.error('Failed to record like:', err);
+            }
+          }}
+          onDislike={async (r) => {
+            try {
+              await recommendService.recordInterest(userProfile.user_id, r.name, 'dislike');
+            } catch (err) {
+              console.error('Failed to record dislike:', err);
+            }
+          }}
         />
         <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
           <DialogContent className="sm:max-w-md rounded-t-3xl p-0 overflow-hidden border-none max-h-[90vh] flex flex-col">
@@ -639,9 +658,28 @@ export function RestaurantRecommendationScreenNew({
                     <div className="text-right"><p className="text-sm text-gray-500">가격</p><p className="text-xl font-bold text-green-600">{selectedRestaurant.price}</p></div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Zap className="w-5 h-5 text-orange-500" /><span className="text-xs text-gray-500">열량</span><span className="font-bold">{selectedRestaurant.signatureCalories}kcal</span></div>
-                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Navigation className="w-5 h-5 text-blue-500" /><span className="text-xs text-gray-500">거리</span><span className="font-bold">{selectedRestaurant.distance}km</span></div>
-                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Star className="w-5 h-5 text-yellow-500" /><span className="text-xs text-gray-500">평점</span><span className="font-bold">{selectedRestaurant.rating}</span></div>
+                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Zap className="w-5 h-5 text-orange-500" /><span className="text-xs text-gray-500 font-medium">열량</span><span className="font-bold">{selectedRestaurant.signatureCalories}kcal</span></div>
+                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Navigation className="w-5 h-5 text-blue-500" /><span className="text-xs text-gray-500 font-medium">거리</span><span className="font-bold">{selectedRestaurant.distance}km</span></div>
+                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Star className="w-5 h-5 text-yellow-500" /><span className="text-xs text-gray-500 font-medium">평점</span><span className="font-bold">{selectedRestaurant.rating}</span></div>
+                  </div>
+                  
+                  {/* Macronutrients */}
+                  <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                    <p className="text-sm font-bold text-gray-800 mb-3 ml-1">영양 밸런스</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="flex flex-col items-center p-2 rounded-xl bg-blue-50/50">
+                        <span className="text-[10px] text-blue-600 font-bold mb-1">탄수화물</span>
+                        <span className="text-sm font-black text-gray-900">{selectedRestaurant.carbs}g</span>
+                      </div>
+                      <div className="flex flex-col items-center p-2 rounded-xl bg-red-50/50">
+                        <span className="text-[10px] text-red-600 font-bold mb-1">단백질</span>
+                        <span className="text-sm font-black text-gray-900">{selectedRestaurant.protein}g</span>
+                      </div>
+                      <div className="flex flex-col items-center p-2 rounded-xl bg-orange-50/50">
+                        <span className="text-[10px] text-orange-600 font-bold mb-1">지방</span>
+                        <span className="text-sm font-black text-gray-900">{selectedRestaurant.fat}g</span>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex gap-4 bg-green-50 p-4 rounded-2xl">
                     <MapPin className="w-6 h-6 text-green-600 shrink-0" />
@@ -658,7 +696,7 @@ export function RestaurantRecommendationScreenNew({
           </DialogContent>
         </Dialog>
         {feedbackRestaurant && <FeedbackModal open={showFeedbackModal} onOpenChange={(open) => { setShowFeedbackModal(open); if (!open) setFeedbackRestaurant(null); }} restaurant={feedbackRestaurant} />}
-      </>
+      </div>
     );
   }
 

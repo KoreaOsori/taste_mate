@@ -8,7 +8,7 @@ const API_BASE_URL =
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 5000,
+    timeout: 20000,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -141,6 +141,14 @@ export const recommendService = {
     getAddress: async (lat: number, lng: number) => {
         const response = await apiClient.get<{ address: string }>('/recommend/address', {
             params: { lat, lng },
+        });
+        return response.data;
+    },
+    recordInterest: async (userId: string, restaurantName: string, action: 'like' | 'dislike') => {
+        const response = await apiClient.post('/recommend/interest', {
+            user_id: userId,
+            restaurant_name: restaurantName,
+            action,
         });
         return response.data;
     },

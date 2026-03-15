@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, MapPin, X, Heart, RefreshCcw, Info } from 'lucide-react';
+import { Star, MapPin, X, Heart, RefreshCcw, Info, Utensils } from 'lucide-react';
 
 interface Restaurant {
   id: string;
@@ -29,18 +29,29 @@ interface RestaurantRecommendationCardViewProps {
   onSelectRestaurant: (restaurant: Restaurant) => void;
   onShowFeedback: (restaurant: { name: string; menu: string }) => void;
   onRefresh?: () => void;
+  onLike?: (restaurant: Restaurant) => void;
+  onDislike?: (restaurant: Restaurant) => void;
 }
 
 export function RestaurantRecommendationCardView({
   restaurants,
   onSelectRestaurant,
   onShowFeedback,
-  onRefresh
+  onRefresh,
+  onLike,
+  onDislike
 }: RestaurantRecommendationCardViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [exitX, setExitX] = useState<number | string>(0);
 
   const handleSwipe = (direction: 'left' | 'right') => {
+    const currentRestaurant = restaurants[currentIndex];
+    if (direction === 'right' && onLike) {
+      onLike(currentRestaurant);
+    } else if (direction === 'left' && onDislike) {
+      onDislike(currentRestaurant);
+    }
+
     setExitX(direction === 'left' ? -1000 : 1000);
     setTimeout(() => {
       if (currentIndex < restaurants.length - 1) {
@@ -81,25 +92,36 @@ export function RestaurantRecommendationCardView({
   }
 
   const currentRestaurant = restaurants[currentIndex];
+  // Calculate relative drag distance for stamps
+  const [dragProgress, setDragProgress] = useState(0);
 
   return (
-    <div className="relative h-[calc(100vh-140px)] flex flex-col items-center justify-between bg-white overflow-hidden p-4">
+    <div className="relative w-full h-full flex flex-col items-center bg-white overflow-hidden p-4">
       {/* Header */}
-      <div className="w-full flex items-center justify-between px-2 mb-4">
+      <div className="w-full flex items-center justify-between px-2 mb-2 shrink-0">
         <h2 className="text-2xl font-black text-gray-900 tracking-tight">오늘의 추천</h2>
         <div className="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-sm">
           {currentIndex + 1} / {restaurants.length}
         </div>
+        {/* Diagnostic Marker */}
+        <span className="sr-only" data-ui-version="2.1-robust-inline"></span>
       </div>
 
       {/* Card Container */}
-      <div className="relative w-full flex-1 max-w-md perspective-1000">
-        <AnimatePresence>
+      <div 
+        className="relative w-full flex-1 max-w-md perspective-1000 my-2 z-10"
+        style={{ minHeight: '420px', display: 'flex' }}
+      >
+        <AnimatePresence mode='wait'>
           <motion.div
             key={currentRestaurant.id}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
+            onDrag={(_, info) => {
+              setDragProgress(info.offset.x);
+            }}
             onDragEnd={(_, info) => {
+              setDragProgress(0);
               if (info.offset.x > 100) handleSwipe('right');
               else if (info.offset.x < -100) handleSwipe('left');
             }}
@@ -108,18 +130,43 @@ export function RestaurantRecommendationCardView({
             exit={{ x: exitX, opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
             className="absolute inset-0 bg-white rounded-3xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing border border-gray-100"
           >
-            {/* Image Section */}
-            <div
-              className="relative h-full w-full"
-              onClick={() => onSelectRestaurant(currentRestaurant)}
-            >
-              <img
-                src={currentRestaurant.imageUrl}
-                alt={currentRestaurant.name}
-                className="w-full h-full object-cover"
-              />
-              {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/0" />
+              {/* Image Section */}
+              <div
+                className="relative h-full w-full bg-gray-100"
+                onClick={() => onSelectRestaurant(currentRestaurant)}
+              >
+                {currentRestaurant.imageUrl ? (
+                  <img
+                    src={currentRestaurant.imageUrl}
+                    alt={currentRestaurant.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-d5bfd2cbfb1f?w=800';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-green-50">
+                    <Utensils className="w-12 h-12 text-green-200" />
+                  </div>
+                )}
+                
+                {/* Swipe Stamps */}
+                <motion.div 
+                  style={{ opacity: dragProgress > 20 ? Math.min((dragProgress - 20) / 100, 1) : 0 }}
+                  className="absolute top-10 left-10 z-20 border-4 border-green-500 rounded-lg px-4 py-1 -rotate-12 bg-white/10"
+                >
+                  <span className="text-green-500 text-4xl font-black tracking-widest">LIKE</span>
+                </motion.div>
+
+                <motion.div 
+                  style={{ opacity: dragProgress < -20 ? Math.min(Math.abs(dragProgress + 20) / 100, 1) : 0 }}
+                  className="absolute top-10 right-10 z-20 border-4 border-red-500 rounded-lg px-4 py-1 rotate-12 bg-white/10"
+                >
+                  <span className="text-red-500 text-4xl font-black tracking-widest">NOPE</span>
+                </motion.div>
+
+                {/* Gradient Overlay - Stronger for better text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent z-10" />
 
               {/* Detail Info Indicator */}
               <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md rounded-full p-2">
@@ -127,42 +174,52 @@ export function RestaurantRecommendationCardView({
               </div>
 
               {/* Bottom Info Overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                <h3 className="text-4xl font-bold mb-2 drop-shadow-lg">{currentRestaurant.name}</h3>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-bold">{currentRestaurant.rating}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full">
-                    <MapPin className="w-4 h-4" />
-                    <span>{currentRestaurant.distance}km</span>
-                  </div>
-                </div>
-
-                <p className="text-lg font-medium bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/20 line-clamp-2">
-                  "{currentRestaurant.reason}"
-                </p>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="bg-green-500/80 backdrop-blur-sm text-white px-3 py-1 rounded-lg text-sm font-bold">
+              <div className="absolute bottom-0 left-0 right-0 p-8 text-white z-20">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shadow-sm">
                     {currentRestaurant.category}
                   </span>
-                  <span className="bg-blue-500/80 backdrop-blur-sm text-white px-3 py-1 rounded-lg text-sm font-bold">
-                    {currentRestaurant.signatureCalories}kcal
-                  </span>
+                  <div className="items-center gap-1 text-yellow-400 flex drop-shadow-sm">
+                    <Star className="w-3.5 h-3.5 fill-current" />
+                    <span className="text-sm font-bold">{currentRestaurant.rating}</span>
+                  </div>
+                </div>
+
+                <h3 className="text-3xl font-black mb-2 tracking-tight line-clamp-1 drop-shadow-md">
+                  {currentRestaurant.name}
+                </h3>
+                
+                <div className="flex items-center gap-3 mb-5 text-gray-100 text-sm drop-shadow-sm">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="w-4 h-4" />
+                    <span className="font-medium">{currentRestaurant.address}</span>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 mb-6 shadow-canvas">
+                  <p className="text-base font-medium leading-relaxed italic drop-shadow-sm">
+                    "{currentRestaurant.reason}"
+                  </p>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 shadow-sm">
+                    <p className="text-xs text-gray-300 mb-1 font-semibold uppercase tracking-wider">대표메뉴</p>
+                    <p className="font-bold truncate text-lg drop-shadow-sm">{currentRestaurant.signature}</p>
+                  </div>
+                  <div className="bg-green-600/90 backdrop-blur-md rounded-xl p-3 px-6 flex flex-col items-center justify-center shadow-lg border border-white/10">
+                    <p className="text-xs text-white/80 mb-0.5 font-bold">칼로리</p>
+                    <p className="text-xl font-black drop-shadow-sm">{currentRestaurant.signatureCalories}kcal</p>
+                  </div>
                 </div>
               </div>
-
-              {/* Swipe Stamps */}
-              {/* These appear while dragging - simplified for now */}
             </div>
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* Action Buttons */}
-      <div className="w-full flex items-center justify-center gap-6 py-6 mt-4">
+      <div className="w-full flex items-center justify-center gap-6 py-6 mt-auto shrink-0">
         {/* Dislike - Slide Left */}
         <button
           onClick={() => handleSwipe('left')}
