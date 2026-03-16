@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, MapPin, X, Heart, RefreshCcw, Info, Utensils } from 'lucide-react';
 
@@ -45,13 +45,7 @@ export function RestaurantRecommendationCardView({
   const [exitX, setExitX] = useState<number | string>(0);
 
   const handleSwipe = (direction: 'left' | 'right') => {
-    const currentRestaurant = restaurants[currentIndex];
-    if (direction === 'right' && onLike) {
-      onLike(currentRestaurant);
-    } else if (direction === 'left' && onDislike) {
-      onDislike(currentRestaurant);
-    }
-
+    // 단순히 카드만 넘기고, like/dislike는 별도 버튼으로만 처리
     setExitX(direction === 'left' ? -1000 : 1000);
     setTimeout(() => {
       if (currentIndex < restaurants.length - 1) {
@@ -93,9 +87,26 @@ export function RestaurantRecommendationCardView({
 
   const currentRestaurant = restaurants[currentIndex];
   // Calculate relative drag distance for stamps
-  const [dragProgress, setDragProgress] = useState(0);
   // 스와이프로 인한 이동이 이하면 "탭"으로 간주 → 상세 모달 열기 (드래그 시에는 click 이벤트가 안 뜨는 문제 보정)
   const TAP_THRESHOLD_PX = 40;
+  const SWIPE_DISTANCE_PX = 80;
+
+  // 개발 편의를 위한 키보드 좌우 이동 (← NOPE / → LIKE)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (restaurants.length === 0) return;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleSwipe('right');
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleSwipe('left');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurants, currentIndex]);
 
   return (
     <div className="relative w-full h-full flex flex-col items-center bg-white overflow-hidden p-4 pt-3 min-h-0">
@@ -122,16 +133,17 @@ export function RestaurantRecommendationCardView({
             key={currentRestaurant.id}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
-            onDrag={(_, info) => {
-              setDragProgress(info.offset.x);
-            }}
+            onDrag={(_, info) => {}}
             onDragEnd={(_, info) => {
               setDragProgress(0);
               const dx = info.offset.x;
-              if (dx > 100) handleSwipe('right');
-              else if (dx < -100) handleSwipe('left');
-              // 스와이프가 아니면 탭으로 간주 → 상세(추가 정보 + 이걸로 먹을게요) 열기
-              else if (Math.abs(dx) <= TAP_THRESHOLD_PX) {
+
+              if (dx > SWIPE_DISTANCE_PX) {
+                handleSwipe('right');
+              } else if (dx < -SWIPE_DISTANCE_PX) {
+                handleSwipe('left');
+              } else if (Math.abs(dx) <= TAP_THRESHOLD_PX) {
+                // 스와이프가 아니면 탭으로 간주 → 상세(추가 정보 + 이걸로 먹을게요) 열기
                 onSelectRestaurant(currentRestaurant);
               }
             }}
@@ -163,18 +175,6 @@ export function RestaurantRecommendationCardView({
                 <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
                   <Info className="w-4 h-4 text-white" />
                 </div>
-                <motion.div 
-                  style={{ opacity: dragProgress > 20 ? Math.min((dragProgress - 20) / 100, 1) : 0 }}
-                  className="absolute top-8 left-8 z-20 border-4 border-green-500 rounded-lg px-3 py-0.5 -rotate-12 bg-white/90"
-                >
-                  <span className="text-green-600 text-2xl font-black tracking-widest">LIKE</span>
-                </motion.div>
-                <motion.div 
-                  style={{ opacity: dragProgress < -20 ? Math.min(Math.abs(dragProgress + 20) / 100, 1) : 0 }}
-                  className="absolute top-8 right-8 z-20 border-4 border-red-500 rounded-lg px-3 py-0.5 rotate-12 bg-white/90"
-                >
-                  <span className="text-red-600 text-2xl font-black tracking-widest">NOPE</span>
-                </motion.div>
               </div>
 
               {/* 하단: 카드에는 거리·추천 사유·가격대만 (칼로리·대표메뉴는 클릭 시 세부 정보에) */}
