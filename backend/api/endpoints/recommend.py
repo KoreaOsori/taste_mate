@@ -1,8 +1,9 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import os
 import httpx
+import math
 from datetime import datetime
 
 router = APIRouter()
@@ -27,11 +28,15 @@ class RestaurantRecommendation(BaseModel):
     carbs: float
     fat: float
     address: str
+    place_lat: Optional[float] = None  # 길찾기용 식당 위도
+    place_lng: Optional[float] = None  # 길찾기용 식당 경도
 
 # Default Location: Seoul, Gangnam (latitude, longitude)
+# 주의: use_location=false 이면 이 좌표로 검색하지 않음. "비슷한 맛집"만 메뉴명으로 검색.
 DEFAULT_LAT = 37.4979
 DEFAULT_LNG = 127.0276
 DEFAULT_LOCATION_NAME = "서울시 강남구"
+ADDRESS_WHEN_NO_LOCATION = "위치를 허용하면 주변 맛집을 보여드려요"
 # Curated fallback recommendations (used when no user profile or API unavailable)
 DEFAULT_RECOMMENDATIONS: List[dict] = [
     {
@@ -111,9 +116,9 @@ CATEGORY_FALLBACK_IMAGES = {
     "default": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=800"
 }
 
-async def search_naver_image(query: str, fallback_category: str = "default") -> str:
+async def search_naver_image(query: str, fallback_category: str = "default", menu_name: Optional[str] = None) -> str:
     """
-    Search Naver Image API with multi-step logic and high-quality fallback.
+    Search Naver Image API. menu_name이 있으면 메뉴와 이미지 매칭을 위해 메뉴명 위주로 먼저 검색.
     """
     client_id = os.environ.get("NAVER_CLIENT_ID", "")
     client_secret = os.environ.get("NAVER_CLIENT_SECRET", "")
@@ -137,17 +142,74 @@ async def search_naver_image(query: str, fallback_category: str = "default") -> 
             print(f"[DEBUG] Naver Image fetch error for '{q}': {e}")
         return None
 
-    # Step 1: Specific search (Restaurant + Menu)
+    # Step 1: 메뉴명 위주 검색 — 추천 메뉴(쏨땀, 제육볶음 등)와 이미지가 맞도록
+    if menu_name and menu_name.strip():
+        img = await fetch(f"{menu_name.strip()} 음식")
+        if img: return img
+        img = await fetch(menu_name.strip())
+        if img: return img
+    # Step 2: 식당명 + 메뉴명
     img = await fetch(query)
     if img: return img
-    
-    # Step 2: Slightly broader search (Restaurant + "대표메뉴")
+    # Step 3: 식당명 + 대표메뉴
     restaurant_name = query.split(' ')[0]
     img = await fetch(f"{restaurant_name} 대표메뉴")
     if img: return img
-
-    # Step 3: Best fallback from curated list
+    # Step 4: 카테고리 폴백
     return CATEGORY_FALLBACK_IMAGES.get(fallback_category, CATEGORY_FALLBACK_IMAGES["default"])
+
+async def get_google_place_photo(place_name: str, address: str) -> Optional[str]:
+    """
+    Google Places API(Find Place + Place Details + Photo)로 실제 식당 이미지 URL 반환.
+    키 없거나 검색 실패 시 None. API 키는 HTTP referrer 제한 권장.
+    """
+    api_key = os.environ.get("GOOGLE_PLACES_API_KEY", "").strip()
+    if not api_key or not place_name or not address:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            # 1) Find Place from text → place_id
+            query = f"{place_name} {address}".strip()
+            find_url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
+            find_res = await client.get(
+                find_url,
+                params={
+                    "input": query[:200],
+                    "inputtype": "textquery",
+                    "fields": "place_id",
+                    "key": api_key,
+                },
+            )
+            if find_res.status_code != 200:
+                return None
+            data = find_res.json()
+            candidates = data.get("candidates") or []
+            if not candidates:
+                return None
+            place_id = candidates[0].get("place_id")
+            if not place_id:
+                return None
+            # 2) Place Details → photos[0].photo_reference
+            details_url = "https://maps.googleapis.com/maps/api/place/details/json"
+            details_res = await client.get(
+                details_url,
+                params={"place_id": place_id, "fields": "photos", "key": api_key},
+            )
+            if details_res.status_code != 200:
+                return None
+            details = details_res.json()
+            result = details.get("result") or {}
+            photos = result.get("photos") or []
+            if not photos:
+                return None
+            ref = photos[0].get("photo_reference")
+            if not ref:
+                return None
+            # 3) Place Photo URL (302 리다이렉트로 실제 이미지)
+            return f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={ref}&key={api_key}"
+    except Exception as e:
+        print(f"[DEBUG] Google Place photo error: {e}")
+    return None
 
 async def search_naver_local(query: str) -> List[dict]:
     """Search Naver Local API for restaurants. Returns empty list on error."""
@@ -206,6 +268,42 @@ async def get_address_from_coords(lat: float, lng: float) -> str:
     
     return DEFAULT_LOCATION_NAME
 
+async def get_coords_from_address(address: str) -> Optional[Tuple[float, float]]:
+    """주소 → (위도, 경도) 변환. Kakao Local API 사용."""
+    if not address or not address.strip():
+        return None
+    kakao_key = os.environ.get("KAKAO_REST_API_KEY") or os.environ.get("KAKAO_NATIVE_APP_KEY", "")
+    if not kakao_key:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                "https://dapi.kakao.com/v2/local/search/address.json",
+                params={"query": address.strip()},
+                headers={"Authorization": f"KakaoAK {kakao_key}"},
+            )
+            if response.status_code == 200:
+                data = response.json()
+                docs = data.get("documents", [])
+                if docs:
+                    x = docs[0].get("x")  # 경도
+                    y = docs[0].get("y")  # 위도
+                    if x and y:
+                        return (float(y), float(x))
+    except Exception as e:
+        print(f"[DEBUG] get_coords_from_address error: {e}")
+    return None
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """두 위경도 사이 거리(km)."""
+    R = 6371  # Earth radius km
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(R * c, 1)
+
 def get_user_profile_from_supabase(user_id: str) -> Optional[dict]:
     """Fetch user profile from Supabase. Returns None on any error."""
     try:
@@ -218,6 +316,10 @@ def get_user_profile_from_supabase(user_id: str) -> Optional[dict]:
         print(f"Profile fetch error (non-fatal): {e}")
     return None
 
+# 커피·디저트 추천 시 사용할 side 음식 food_group (meal_role=side 인 항목)
+SIDE_FOOD_GROUP_BEVERAGE = "음료 및 차류"   # 커피, 음료, 차
+SIDE_FOOD_GROUP_BAKERY = "빵 및 과자류"     # 빵, 케이크, 과자
+
 def get_foods_v2_candidates() -> List[dict]:
     """Fetch all active food candidates from foods_v2."""
     try:
@@ -228,6 +330,17 @@ def get_foods_v2_candidates() -> List[dict]:
     except Exception as e:
         print(f"Error fetching foods_v2: {e}")
         return []
+
+def _filter_side_candidates(candidates: List[dict], preference: Optional[str]) -> List[dict]:
+    """커피·디저트 플로우: meal_role=side 이고, 선택에 맞는 food_group만."""
+    side = [c for c in candidates if (c.get("meal_role") or "").strip() == "side"]
+    if preference == "커피, 음료, 차":
+        return [c for c in side if (c.get("food_group") or "").strip() == SIDE_FOOD_GROUP_BEVERAGE]
+    if preference == "빵, 케이크, 과자":
+        return [c for c in side if (c.get("food_group") or "").strip() == SIDE_FOOD_GROUP_BAKERY]
+    # 둘 다 허용
+    allowed = {SIDE_FOOD_GROUP_BEVERAGE, SIDE_FOOD_GROUP_BAKERY}
+    return [c for c in side if (c.get("food_group") or "").strip() in allowed]
 
 @router.get("/food-search")
 async def food_search(q: Optional[str] = None):
@@ -299,16 +412,22 @@ async def generate_personalized_query_and_reasons(
                 "형식: JSON 응답. {\"query\": \"검색어\", \"advice\": \"...\"}"
             )
         else:
-            candidates_info = "\n".join([f"- {c['name']} (칼로리: {c['calories']}kcal, 단백질: {c['protein']}g, 특징: {c.get('taste', '')} {c.get('meal_heaviness', '')})" for c in top_candidates])
+            allowed_cats = user_qna.get('categories') or []
+            candidates_info = "\n".join([f"- {c['name']} (종류: {c.get('category', '')}, 칼로리: {c['calories']}kcal, 단백질: {c['protein']}g, 특징: {c.get('taste', '')} {c.get('meal_heaviness', '')})" for c in top_candidates])
+            category_rule = ""
+            if allowed_cats:
+                cat_list = ", ".join(allowed_cats)
+                category_rule = f"0. [필수] 사용자가 선택한 음식 종류는 '{cat_list}' 입니다. selected_food_names에는 반드시 이 종류(category)에 해당하는 메뉴만 포함하세요. 선택하지 않은 종류(예: 일식을 고르지 않았으면 일식 메뉴 제외)는 절대 포함하지 마세요.\n"
             prompt = (
                 f"사용자 이름: {name}\n"
                 f"다이어트 목표: {goal}\n"
                 f"오늘 남은 칼로리: {remaining_cal}kcal\n"
                 f"현재 날씨: {weather}, 현재 시간: {hour}시\n"
-                f"사용자 기분: {user_qna.get('emotion', '응답없음')}, 동행: {user_qna.get('companion', '응답없음')}, 취향: {user_qna.get('preference', '응답없음')}, 예산: {user_qna.get('budget', '응답없음')}\n\n"
-                f"추천 리스트:\n{candidates_info}\n\n"
+                f"사용자 기분: {user_qna.get('emotion', '응답없음')}, 동행: {user_qna.get('companion', '응답없음')}, 취향(맛): {user_qna.get('preference', '응답없음')}, 예산: {user_qna.get('budget', '응답없음')}\n\n"
+                f"추천 후보 리스트 (이 중에서만 선정):\n{candidates_info}\n\n"
                 "목표: 사용자의 상황에 가장 잘 맞는 1~3개의 메뉴를 선정하고, 네이버 맛집 검색어(query)와 60자 이내의 설득력 있는 정량적 조언(advice)을 작성하세요.\n"
                 "규칙:\n"
+                + category_rule +
                 "1. 현재 날씨와 기분을 조언에 녹여내세요.\n"
                 "2. 남은 칼로리와 단백질 함량을 구체적으로 언급하며 추천 이유를 설명하세요.\n"
                 "형식: JSON 응답. {\"query\": \"선택된메뉴이름 주변맛집\", \"advice\": \"...\", \"selected_food_names\": [\"메뉴1\", \"메뉴2\"]}"
@@ -348,15 +467,17 @@ async def get_current_address(lat: float, lng: float):
 
 @router.get("/{user_id}", response_model=List[RestaurantRecommendation])
 async def get_recommendations(
-    user_id: str, 
-    lat: Optional[float] = None, 
+    user_id: str,
+    lat: Optional[float] = None,
     lng: Optional[float] = None,
+    use_location: Optional[bool] = None,
     weather: Optional[str] = "맑음",
     hour: Optional[int] = None,
     emotion: Optional[str] = None,
     companion: Optional[str] = None,
     preference: Optional[str] = None,
-    budget: Optional[str] = None
+    budget: Optional[str] = None,
+    categories: Optional[str] = None,
 ):
     profile = get_user_profile_from_supabase(user_id)
     
@@ -369,6 +490,11 @@ async def get_recommendations(
         meals_data = []
 
     current_hour = hour if hour is not None else datetime.now().hour
+    
+    # 사용자가 선택한 음식 종류(중식, 패스트푸드, 아시안 등) — 이 종류만 추천되도록
+    allowed_categories: List[str] = []
+    if categories and categories.strip():
+        allowed_categories = [c.strip() for c in categories.split(",") if c.strip()]
     
     # 0. Check if it's a dessert flow
     is_dessert_flow = preference in ['커피, 음료, 차', '빵, 케이크, 과자']
@@ -385,34 +511,49 @@ async def get_recommendations(
         'emotion': emotion,
         'companion': companion,
         'preference': preference,
-        'budget': budget
+        'budget': budget,
+        'categories': allowed_categories,
     }
     
-    # 2. Fetch all candidates & Rank
+    # 2. Fetch candidates & Rank (커피·디저트면 meal_role=side, food_group=음료 및 차류/빵 및 과자류만)
     all_candidates = get_foods_v2_candidates()
+    if is_dessert_flow:
+        all_candidates = _filter_side_candidates(all_candidates, preference)
     if all_candidates:
         from models.ranker import RecommendationRanker
         ranker = RecommendationRanker()
         ranked_candidates = ranker.score_candidates(all_candidates, user_features)
-        top_candidates = ranked_candidates[:10]
+        # 사용자가 음식 종류를 선택했으면, 선정 후보는 선택한 종류만 넘김 (일식 등 비선택 종류 제외)
+        if allowed_categories:
+            filtered = [c for c in ranked_candidates if (c.get('category') or '').strip() in allowed_categories]
+            top_candidates = (filtered[:10] if filtered else ranked_candidates[:10])
+        else:
+            top_candidates = ranked_candidates[:10]
     else:
         top_candidates = []
 
-    # 3. LLM Logic
-    user_qna = {'emotion': emotion, 'companion': companion, 'preference': preference, 'budget': budget}
+    # 3. LLM Logic (선택한 음식 종류만 선정하도록 user_qna에 전달)
+    user_qna = {'emotion': emotion, 'companion': companion, 'preference': preference, 'budget': budget, 'categories': allowed_categories}
     llm_result = await generate_personalized_query_and_reasons(
         user_id, profile, meals_data, weather, current_hour, top_candidates, user_qna
     )
     
     query_text = llm_result.get("query", "맛집")
     personal_advice = llm_result.get("advice", "오늘의 건강한 선택을 도와드릴게요.")
-    selected_foods = llm_result.get("candidates", [])
+    # 커피·디저트 플로우는 LLM이 candidates를 안 넘기므로, 랭킹된 side 후보를 그대로 사용
+    selected_foods = llm_result.get("candidates", []) if not is_dessert_flow else top_candidates[:5]
 
-    # 4. Precise Location Search
-    actual_lat = lat if lat is not None else DEFAULT_LAT
-    actual_lng = lng if lng is not None else DEFAULT_LNG
-    admin_address = await get_address_from_coords(actual_lat, actual_lng)
-    location_keyword = admin_address.split(' ')[-1] if ' ' in admin_address else admin_address
+    # 4. Location-aware vs. "similar only" search
+    # use_location=false: 위치 없음 → 지역 키워드 없이 메뉴명만 검색 (비슷한 맛집). 강남 기본값 사용 안 함.
+    # use_location=true 또는 생략 + 좌표 있음: 행정동 + 메뉴명으로 주변 맛집 검색.
+    use_location_search = use_location if use_location is not None else (lat is not None and lng is not None)
+    if use_location_search and lat is not None and lng is not None:
+        admin_address = await get_address_from_coords(lat, lng)
+        # 동만 쓰면 다른 시·도(예: 대전) 결과가 섞일 수 있음 → 시·구·동 전체로 검색 (예: 광주 동구 서석동)
+        location_keyword = admin_address.strip() if admin_address else ""
+    else:
+        location_keyword = ""
+        # 좌표 없을 때는 Kakao 호출하지 않음 (기본값 강남으로 주소 받지 않음)
 
     # Determine menus to search for
     # If dessert flow, search for the dessert category.
@@ -429,40 +570,81 @@ async def get_recommendations(
     import asyncio
     results = []
     history_to_insert = []
-    
+    # 위치 검색 시: 다른 시·도 결과 제외용 (예: 광주 사용자에게 대전 상호 안 나오게)
+    def _region_filter_word(addr: str) -> str:
+        if not addr or not addr.strip():
+            return ""
+        first = addr.split()[0].strip()
+        for suffix in ["광역시", "특별시", "특별자치시", "도", "특별자치도"]:
+            if first.endswith(suffix):
+                return first[: -len(suffix)]
+        return first
+
+    region_filter = _region_filter_word(location_keyword) if location_keyword else ""
+
     async def find_restaurant_for_food(food, idx):
-        # Search for "[Dong] [Food Name] 맛집"
-        # Example: "역삼동 제육볶음 맛집"
-        search_query = f"{location_keyword} {food['name']} 맛집"
+        # use_location: "[시·구·동] [메뉴명] 맛집" (주변). no location: "[메뉴명] 맛집" (비슷한 맛집만)
+        if location_keyword:
+            search_query = f"{location_keyword} {food['name']} 맛집"
+            fallback_query = f"{location_keyword} {food.get('category', '맛집')}"
+        else:
+            search_query = f"{food['name']} 맛집"
+            fallback_query = f"{food.get('category', '맛집')} 맛집"
         print(f"[DEBUG] Searching for specific food: {search_query}")
         
         items = await search_naver_local(search_query)
         if not items:
-            # Fallback to a broader search if no specific results
-            items = await search_naver_local(f"{location_keyword} {food.get('category', '맛집')}")
+            items = await search_naver_local(fallback_query)
         
+        if not items:
+            return None
+        
+        # 같은 시·도만 허용 (광주 사용자에게 대전 등 다른 지역 상호 제외)
+        if region_filter:
+            combined = lambda i: (i.get("address") or "") + " " + (i.get("roadAddress") or "")
+            items = [i for i in items if region_filter in combined(i)]
         if not items:
             return None
         
         # Pick the top result for this specific food
         item = items[0]
         name = item.get("title", "").replace("<b>", "").replace("</b>", "")
-        address = item.get("roadAddress") or item.get("address", "")
+        address = (item.get("roadAddress") or item.get("address", "")) if use_location_search else ADDRESS_WHEN_NO_LOCATION
         naver_link = item.get("link", "https://map.naver.com")
         cat = food.get("category", "맛집")
         
-        # Image search: "[Restaurant Name] [Recommended Food]"
-        img_query = f"{name} {food['name']}"
-        image_url = await search_naver_image(img_query, fallback_category=cat)
-        
+        # 거리 + 길찾기용 좌표: 사용자 좌표와 식당 주소로 실제 거리 계산
+        distance_km = 0.5
+        place_lat_opt: Optional[float] = None
+        place_lng_opt: Optional[float] = None
+        if use_location_search and lat is not None and lng is not None and address and address != ADDRESS_WHEN_NO_LOCATION:
+            place_coords = await get_coords_from_address(address)
+            if place_coords:
+                place_lat_val, place_lon_val = place_coords
+                distance_km = _haversine_km(lat, lng, place_lat_val, place_lon_val)
+                place_lat_opt, place_lng_opt = place_lat_val, place_lon_val
         base = DEFAULT_RECOMMENDATIONS[idx % len(DEFAULT_RECOMMENDATIONS)]
+        if distance_km <= 0:
+            distance_km = base.get("distance", 0.5)
+        
+        # 평점: 네이버 지역검색 API는 평점 미제공 → 식당명 기준으로 4.0~4.9 다양하게 표시
+        rating = 4.0 + (hash(name) % 10) / 10.0 if name else 4.5
+        rating = round(rating, 1)
+        
+        # 이미지: Google Places 실제 식당 사진 우선 → 실패 시 네이버 이미지 검색
+        image_url = None
+        if name and address and address != ADDRESS_WHEN_NO_LOCATION:
+            image_url = await get_google_place_photo(name, address)
+        if not image_url:
+            img_query = f"{name} {food['name']}"
+            image_url = await search_naver_image(img_query, fallback_category=cat, menu_name=food.get('name'))
         
         return RestaurantRecommendation(
             id=f"rec_{idx}_{food['name']}",
             name=name,
             category=cat,
-            distance=base.get("distance", 0.5),
-            rating=float(item.get("rating") or (base.get("rating", 4.5) * 10)) / 10 if item.get("rating") else base.get("rating", 4.5),
+            distance=distance_km,
+            rating=rating,
             reviewCount=base.get("reviewCount", 100),
             signature=food['name'],
             signatureCalories=int(food.get("calories", 500)),
@@ -475,6 +657,8 @@ async def get_recommendations(
             carbs=float(food.get("carbs", 50)),
             fat=float(food.get("fat", 15)),
             address=address,
+            place_lat=place_lat_opt,
+            place_lng=place_lng_opt,
         )
 
     # Process each recommended food in parallel to find matching restaurants
@@ -503,8 +687,6 @@ async def get_recommendations(
         print(f"Failed to log recommendations: {e}")
 
     return results
-
-    return [RestaurantRecommendation(**r) for r in DEFAULT_RECOMMENDATIONS]
 
 class InterestRequest(BaseModel):
     user_id: str

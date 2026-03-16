@@ -94,6 +94,8 @@ export function RestaurantRecommendationCardView({
   const currentRestaurant = restaurants[currentIndex];
   // Calculate relative drag distance for stamps
   const [dragProgress, setDragProgress] = useState(0);
+  // 스와이프로 인한 이동이 이하면 "탭"으로 간주 → 상세 모달 열기 (드래그 시에는 click 이벤트가 안 뜨는 문제 보정)
+  const TAP_THRESHOLD_PX = 40;
 
   return (
     <div className="relative w-full h-full flex flex-col items-center bg-white overflow-hidden p-4">
@@ -122,17 +124,23 @@ export function RestaurantRecommendationCardView({
             }}
             onDragEnd={(_, info) => {
               setDragProgress(0);
-              if (info.offset.x > 100) handleSwipe('right');
-              else if (info.offset.x < -100) handleSwipe('left');
+              const dx = info.offset.x;
+              if (dx > 100) handleSwipe('right');
+              else if (dx < -100) handleSwipe('left');
+              // 스와이프가 아니면 탭으로 간주 → 상세(추가 정보 + 이걸로 먹을게요) 열기
+              else if (Math.abs(dx) <= TAP_THRESHOLD_PX) {
+                onSelectRestaurant(currentRestaurant);
+              }
             }}
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ x: exitX, opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-            className="absolute inset-0 bg-white rounded-3xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing border border-gray-100"
+            className="absolute inset-0 flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing border border-gray-100"
           >
-              {/* Image Section */}
+              {/* 상단: 이미지만 (비율 고정, 텍스트 없음 → 읽기 부담 감소) */}
               <div
-                className="relative h-full w-full bg-gray-100"
+                className="relative w-full flex-shrink-0 bg-gray-100"
+                style={{ height: '38%' }}
                 onClick={() => onSelectRestaurant(currentRestaurant)}
               >
                 {currentRestaurant.imageUrl ? (
@@ -149,71 +157,56 @@ export function RestaurantRecommendationCardView({
                     <Utensils className="w-12 h-12 text-green-200" />
                   </div>
                 )}
-                
-                {/* Swipe Stamps */}
+                <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
+                  <Info className="w-4 h-4 text-white" />
+                </div>
                 <motion.div 
                   style={{ opacity: dragProgress > 20 ? Math.min((dragProgress - 20) / 100, 1) : 0 }}
-                  className="absolute top-10 left-10 z-20 border-4 border-green-500 rounded-lg px-4 py-1 -rotate-12 bg-white/10"
+                  className="absolute top-8 left-8 z-20 border-4 border-green-500 rounded-lg px-3 py-0.5 -rotate-12 bg-white/90"
                 >
-                  <span className="text-green-500 text-4xl font-black tracking-widest">LIKE</span>
+                  <span className="text-green-600 text-2xl font-black tracking-widest">LIKE</span>
                 </motion.div>
-
                 <motion.div 
                   style={{ opacity: dragProgress < -20 ? Math.min(Math.abs(dragProgress + 20) / 100, 1) : 0 }}
-                  className="absolute top-10 right-10 z-20 border-4 border-red-500 rounded-lg px-4 py-1 rotate-12 bg-white/10"
+                  className="absolute top-8 right-8 z-20 border-4 border-red-500 rounded-lg px-3 py-0.5 rotate-12 bg-white/90"
                 >
-                  <span className="text-red-500 text-4xl font-black tracking-widest">NOPE</span>
+                  <span className="text-red-600 text-2xl font-black tracking-widest">NOPE</span>
                 </motion.div>
-
-                {/* Gradient Overlay - Stronger for better text readability */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent z-10" />
-
-              {/* Detail Info Indicator */}
-              <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md rounded-full p-2">
-                <Info className="w-5 h-5 text-white" />
               </div>
 
-              {/* Bottom Info Overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-8 text-white z-20">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shadow-sm">
+              {/* 하단: 카드에는 거리·추천 사유·가격대만 (칼로리·대표메뉴는 클릭 시 세부 정보에) */}
+              <div className="flex-1 overflow-y-auto p-4 pb-2 bg-white min-h-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">
                     {currentRestaurant.category}
                   </span>
-                  <div className="items-center gap-1 text-yellow-400 flex drop-shadow-sm">
+                  <div className="items-center gap-1 text-amber-500 flex">
                     <Star className="w-3.5 h-3.5 fill-current" />
-                    <span className="text-sm font-bold">{currentRestaurant.rating}</span>
+                    <span className="text-sm font-bold text-gray-800">{currentRestaurant.rating}</span>
                   </div>
                 </div>
-
-                <h3 className="text-3xl font-black mb-2 tracking-tight line-clamp-1 drop-shadow-md">
+                <h3 className="text-xl font-black text-gray-900 tracking-tight line-clamp-1 mb-2">
                   {currentRestaurant.name}
                 </h3>
-                
-                <div className="flex items-center gap-3 mb-5 text-gray-100 text-sm drop-shadow-sm">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    <span className="font-medium">{currentRestaurant.address}</span>
+                <div className="flex items-start gap-1.5 mb-1 text-gray-600 text-sm">
+                  <MapPin className="w-4 h-4 shrink-0 text-green-600 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-gray-500 font-semibold mb-0.5">식당 위치</p>
+                    <p className="text-gray-700 line-clamp-2">{currentRestaurant.address}</p>
                   </div>
                 </div>
-
-                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 mb-6 shadow-canvas">
-                  <p className="text-base font-medium leading-relaxed italic drop-shadow-sm">
-                    "{currentRestaurant.reason}"
+                <div className="flex items-center gap-2 mb-2 text-gray-600 text-sm">
+                  <span>{currentRestaurant.distance}km</span>
+                  <span className="text-gray-300">·</span>
+                  <span className="font-medium text-gray-800">{currentRestaurant.price}</span>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  <p className="text-xs text-gray-500 font-semibold mb-1">추천 사유</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {currentRestaurant.reason}
                   </p>
                 </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 shadow-sm">
-                    <p className="text-xs text-gray-300 mb-1 font-semibold uppercase tracking-wider">대표메뉴</p>
-                    <p className="font-bold truncate text-lg drop-shadow-sm">{currentRestaurant.signature}</p>
-                  </div>
-                  <div className="bg-green-600/90 backdrop-blur-md rounded-xl p-3 px-6 flex flex-col items-center justify-center shadow-lg border border-white/10">
-                    <p className="text-xs text-white/80 mb-0.5 font-bold">칼로리</p>
-                    <p className="text-xl font-black drop-shadow-sm">{currentRestaurant.signatureCalories}kcal</p>
-                  </div>
-                </div>
               </div>
-            </div>
           </motion.div>
         </AnimatePresence>
       </div>

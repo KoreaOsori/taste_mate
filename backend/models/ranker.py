@@ -17,6 +17,7 @@ class RecommendationRanker:
           - companion: str (optional)
           - preference: str (optional)
           - budget: str (optional)
+          - categories: list of str (optional) — 사용자가 선택한 음식 종류(중식, 패스트푸드 등). 이 목록에 있는 종류만 추천.
         """
         
         target_cal = user_features.get('target_calories', 2000)
@@ -28,9 +29,19 @@ class RecommendationRanker:
         preference = user_features.get('preference')
         budget = user_features.get('budget')
         weather = user_features.get('weather', '맑음')
+        allowed_categories = user_features.get('categories') or []
         
         for candidate in candidates:
             score = 0.0
+            
+            # --- 0. Category Match (필수) — 사용자가 선택한 음식 종류만 추천 ---
+            if allowed_categories:
+                food_category = (candidate.get('category') or '').strip()
+                if food_category in allowed_categories:
+                    score += 20  # 선택한 종류면 큰 가산
+                else:
+                    score -= 50  # 선택 안 한 종류(예: 일식)는 강한 감점으로 하단으로
+            # allowed_categories 비어 있으면 카테고리 제한 없음 (바로 추천 모드 등)
             
             # --- 1. Nutrition Match (Calories) ---
             food_cal = candidate.get('calories', 0)

@@ -69,6 +69,8 @@ export interface Restaurant {
     carbs: number;
     fat: number;
     address: string;
+    place_lat?: number | null;
+    place_lng?: number | null;
 }
 
 export interface ChatMessage {
@@ -132,9 +134,19 @@ export interface FoodSuggestion {
 }
 
 export const recommendService = {
-    getRecommendations: async (userId: string, lat?: number, lng?: number, weather?: string, hour?: number, emotion?: string, companion?: string, preference?: string, budget?: string) => {
+    /** use_location: true면 주변 맛집 검색, false면 지역 없이 비슷한 맛집만 검색(기본값 강남 사용 안 함). categories: 사용자가 선택한 음식 종류(중식, 패스트푸드 등)만 추천하도록 제한 */
+    getRecommendations: async (
+        userId: string,
+        lat?: number,
+        lng?: number,
+        options?: { weather?: string; hour?: number; emotion?: string; companion?: string; preference?: string; budget?: string; use_location?: boolean; categories?: string[] }
+    ) => {
+        const { weather, hour, emotion, companion, preference, budget, use_location, categories } = options ?? {};
         const response = await apiClient.get<Restaurant[]>(`/recommend/${userId}`, {
-            params: { lat, lng, weather, hour, emotion, companion, preference, budget },
+            params: {
+                lat, lng, weather, hour, emotion, companion, preference, budget, use_location,
+                categories: categories?.length ? categories.join(',') : undefined,
+            },
         });
         return response.data;
     },

@@ -49,6 +49,8 @@ interface Restaurant {
   carbs: number;
   fat: number;
   address: string;
+  place_lat?: number | null;
+  place_lng?: number | null;
 }
 
 const MOCK_RESTAURANTS: Restaurant[] = [
@@ -185,18 +187,24 @@ export function RestaurantRecommendationScreenNew({
       const companionParam = isDessertFlow ? undefined : (isQuick ? undefined : selectedCompanion);
       const preferenceParam = isDessertFlow ? selectedDessertCategory : (isQuick ? undefined : (selectedPreferences.length > 0 ? selectedPreferences.join(', ') : undefined));
       const budgetParam = isDessertFlow ? undefined : (isQuick ? undefined : selectedBudget);
+      // 사용자가 선택한 음식 종류(중식, 패스트푸드, 아시안 등) — 질문 플로우에서만 전달, 이 종류만 추천되도록
+      const categoriesParam = isDessertFlow ? undefined : (isQuick ? undefined : (selectedCategories.length > 0 ? selectedCategories : undefined));
 
-      const data = await recommendService.getRecommendations(
-        userProfile.user_id,
-        userLocationData?.lat || DEFAULT_LAT,
-        userLocationData?.lng || DEFAULT_LNG,
+      // 위치 없으면 use_location=false → 강남 기본값 사용 안 하고 비슷한 맛집만 검색
+      const hasRealLocation = Boolean(userProfile.location_consent && userLocation);
+      const lat = hasRealLocation ? (userLocationData?.lat ?? DEFAULT_LAT) : undefined;
+      const lng = hasRealLocation ? (userLocationData?.lng ?? DEFAULT_LNG) : undefined;
+
+      const data = await recommendService.getRecommendations(userProfile.user_id, lat, lng, {
         weather,
-        currentHour,
-        emotionParam,
-        companionParam,
-        preferenceParam,
-        budgetParam
-      );
+        hour: currentHour,
+        emotion: emotionParam,
+        companion: companionParam,
+        preference: preferenceParam,
+        budget: budgetParam,
+        use_location: hasRealLocation,
+        categories: categoriesParam,
+      });
 
       if (data && data.length > 0) {
         setRestaurants(data as unknown as Restaurant[]);
@@ -635,56 +643,89 @@ export function RestaurantRecommendationScreenNew({
         />
         <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
           <DialogContent className="sm:max-w-md rounded-t-3xl p-0 overflow-hidden border-none max-h-[90vh] flex flex-col">
-            <DialogHeader className="p-0">
-              <div className="relative h-64 w-full">
+            <DialogHeader className="p-0 shrink-0">
+              <div className="relative h-36 w-full">
                 {selectedRestaurant && (
                   <>
                     <img src={selectedRestaurant.imageUrl} alt={selectedRestaurant.name} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                    <button onClick={() => setShowOrderModal(false)} className="absolute top-4 right-4 w-10 h-10 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center text-white"><X className="w-6 h-6" /></button>
-                    <div className="absolute bottom-6 left-6 text-white text-left">
-                      <p className="text-sm font-bold text-green-400 mb-1">{selectedRestaurant.category}</p>
-                      <DialogTitle className="text-3xl font-bold text-white mb-0">{selectedRestaurant.name}</DialogTitle>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                    <button onClick={() => setShowOrderModal(false)} className="absolute top-3 right-3 w-9 h-9 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center text-white"><X className="w-5 h-5" /></button>
+                    <div className="absolute bottom-3 left-4 text-white text-left">
+                      <span className="text-xs font-semibold text-green-300">{selectedRestaurant.category}</span>
+                      <DialogTitle className="text-lg font-bold text-white leading-tight">{selectedRestaurant.name}</DialogTitle>
                     </div>
                   </>
                 )}
               </div>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 min-h-0">
               {selectedRestaurant && (
                 <>
-                  <div className="flex items-center justify-between border-b pb-4">
-                    <div><p className="text-sm text-gray-500">대표 메뉴</p><p className="text-xl font-bold">{selectedRestaurant.signature}</p></div>
-                    <div className="text-right"><p className="text-sm text-gray-500">가격</p><p className="text-xl font-bold text-green-600">{selectedRestaurant.price}</p></div>
+                  <div className="flex items-center justify-between gap-4 border-b border-gray-200 pb-4">
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500 font-medium mb-0.5">대표 메뉴</p>
+                      <p className="text-base font-bold text-gray-900 truncate">{selectedRestaurant.signature}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-gray-500 font-medium mb-0.5">가격</p>
+                      <p className="text-base font-bold text-green-600">{selectedRestaurant.price}</p>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Zap className="w-5 h-5 text-orange-500" /><span className="text-xs text-gray-500 font-medium">열량</span><span className="font-bold">{selectedRestaurant.signatureCalories}kcal</span></div>
-                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Navigation className="w-5 h-5 text-blue-500" /><span className="text-xs text-gray-500 font-medium">거리</span><span className="font-bold">{selectedRestaurant.distance}km</span></div>
-                    <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Star className="w-5 h-5 text-yellow-500" /><span className="text-xs text-gray-500 font-medium">평점</span><span className="font-bold">{selectedRestaurant.rating}</span></div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-gray-50 p-3 rounded-xl flex flex-col items-center gap-0.5">
+                      <Zap className="w-5 h-5 text-orange-500" />
+                      <span className="text-[11px] text-gray-500 font-medium">열량</span>
+                      <span className="text-base font-bold text-gray-900">{selectedRestaurant.signatureCalories}kcal</span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-xl flex flex-col items-center gap-0.5">
+                      <Navigation className="w-5 h-5 text-blue-500" />
+                      <span className="text-[11px] text-gray-500 font-medium">거리</span>
+                      <span className="text-base font-bold text-gray-900">{selectedRestaurant.distance}km</span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-xl flex flex-col items-center gap-0.5">
+                      <Star className="w-5 h-5 text-yellow-500" />
+                      <span className="text-[11px] text-gray-500 font-medium">평점</span>
+                      <span className="text-base font-bold text-gray-900">{selectedRestaurant.rating}</span>
+                    </div>
                   </div>
-                  
-                  {/* Macronutrients */}
-                  <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                    <p className="text-sm font-bold text-gray-800 mb-3 ml-1">영양 밸런스</p>
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <p className="text-xs font-bold text-gray-700 mb-2">영양 밸런스</p>
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="flex flex-col items-center p-2 rounded-xl bg-blue-50/50">
-                        <span className="text-[10px] text-blue-600 font-bold mb-1">탄수화물</span>
-                        <span className="text-sm font-black text-gray-900">{selectedRestaurant.carbs}g</span>
+                      <div className="flex flex-col items-center py-2 rounded-lg bg-blue-50/80">
+                        <span className="text-[11px] text-blue-600 font-bold mb-0.5">탄수화물</span>
+                        <span className="text-base font-bold text-gray-900">{selectedRestaurant.carbs}g</span>
                       </div>
-                      <div className="flex flex-col items-center p-2 rounded-xl bg-red-50/50">
-                        <span className="text-[10px] text-red-600 font-bold mb-1">단백질</span>
-                        <span className="text-sm font-black text-gray-900">{selectedRestaurant.protein}g</span>
+                      <div className="flex flex-col items-center py-2 rounded-lg bg-red-50/80">
+                        <span className="text-[11px] text-red-600 font-bold mb-0.5">단백질</span>
+                        <span className="text-base font-bold text-gray-900">{selectedRestaurant.protein}g</span>
                       </div>
-                      <div className="flex flex-col items-center p-2 rounded-xl bg-orange-50/50">
-                        <span className="text-[10px] text-orange-600 font-bold mb-1">지방</span>
-                        <span className="text-sm font-black text-gray-900">{selectedRestaurant.fat}g</span>
+                      <div className="flex flex-col items-center py-2 rounded-lg bg-orange-50/80">
+                        <span className="text-[11px] text-orange-600 font-bold mb-0.5">지방</span>
+                        <span className="text-base font-bold text-gray-900">{selectedRestaurant.fat}g</span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-4 bg-green-50 p-4 rounded-2xl">
-                    <MapPin className="w-6 h-6 text-green-600 shrink-0" />
-                    <div><p className="text-sm font-bold">식당 위치</p><p className="text-xs text-gray-600">{selectedRestaurant.address}</p></div>
+                  <div className="flex gap-3 bg-green-50 p-4 rounded-xl border border-green-100">
+                    <MapPin className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-800 mb-0.5">식당 위치</p>
+                      <p className="text-sm text-gray-700 leading-snug break-words">{selectedRestaurant.address}</p>
+                    </div>
                   </div>
+                  {/* 길찾기: 맵만 표시 */}
+                  {userLocation && selectedRestaurant.place_lat != null && selectedRestaurant.place_lng != null && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-800 mb-2">길찾기</p>
+                      <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-100" style={{ height: 200 }}>
+                        <iframe
+                          title="길찾기 지도"
+                          src={`https://map.naver.com/v5/embed/directions/-/-/-/car?start=${userLocation.longitude},${userLocation.latitude}&goal=${selectedRestaurant.place_lng},${selectedRestaurant.place_lat}&pathType=1`}
+                          className="w-full h-full border-0"
+                          allowFullScreen
+                        />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
