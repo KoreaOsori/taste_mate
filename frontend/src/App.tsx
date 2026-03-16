@@ -497,7 +497,20 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => setCurrentScreen('restaurant')}
+              onClick={() => {
+                if (currentScreen === 'restaurant') {
+                  // If already on restaurant screen, clear session and reset via state if possible,
+                  // but simplest is to clear storage and App-level state will eventually re-mount if we use a key.
+                  sessionStorage.removeItem('recommendation_results');
+                  sessionStorage.removeItem('recommendation_is_quick');
+                  sessionStorage.removeItem('recommendation_offset');
+                  // Trigger a slight state change to force child update if needed
+                  setCurrentScreen('home'); 
+                  setTimeout(() => setCurrentScreen('restaurant'), 10);
+                } else {
+                  setCurrentScreen('restaurant');
+                }
+              }}
               className="flex flex-col items-center gap-1 px-3 py-2 rounded-full text-white bg-green-600 -mt-4 shadow-lg"
             >
               <Utensils className="w-7 h-7" />

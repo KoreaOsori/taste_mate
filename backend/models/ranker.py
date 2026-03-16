@@ -28,81 +28,92 @@ class RecommendationRanker:
         preference = user_features.get('preference')
         budget = user_features.get('budget')
         weather = user_features.get('weather', '맑음')
+        goal = user_features.get('goal', 'balanced')
+        hour = user_features.get('hour', 12)
+        disliked_ids = user_features.get('disliked_ids', [])
         
         for candidate in candidates:
+            # 0. Check Negative Feedback (Disliked items)
+            item_id = str(candidate.get('id', ''))
+            if item_id in disliked_ids:
+                candidate['score'] = -100.0 # Force to bottom
+                continue
+
             score = 0.0
             
-            # --- 1. Nutrition Match (Calories) ---
-            food_cal = candidate.get('calories', 0)
-            if food_cal > 0:
-                # We want the food calories to be close to the remaining calories, 
-                # or at least not strictly exceed it by a huge margin.
-                # A simple heuristic: penalty for difference
-                diff = abs(remaining_cal - food_cal)
-                # Max 10 points for perfect match, decreasing as diff increases
-                cal_score = max(0, 10 - (diff / 100))
-                score += cal_score
-            
-            # --- 2. User Q&A Matching ---
-            
-            # Preference (Heaviness / Taste)
-            # mapping preference options like '가벼운', '든든한', '매콤한', '담백한'
+            # --- 1. User Preference (Selected Category) Match (50% Base + Absolute Multiplier) ---
+            pref_points = 0.0
+            food_category = candidate.get('category', '')
             food_heaviness = candidate.get('meal_heaviness', '')
             food_taste = candidate.get('taste', '')
+            food_price = candidate.get('price_per_serving', 0)
             
             if preference:
-                if preference == '가벼운' and '가벼운' in food_heaviness:
-                    score += 5
-                elif preference == '든든한' and '무거운' in food_heaviness:
-                    score += 5
-                elif preference == '매콤한' and candidate.get('spicy_level', 0) > 0:
-                    score += 5
-                elif preference == '담백한' and '담백' in food_taste:
-                    score += 5
-                elif preference == '기름진' and candidate.get('fat', 0) > 20: # Example logic
-                    score += 5
-            
-            # Emotion Match
-            # Mapping emojis/feelings to `emotion_state` like '위로/안정/회복'
-            food_emotion = candidate.get('emotion_state', '')
-            if emotion:
-                if '피곤' in emotion and '회복' in food_emotion:
-                    score += 3
-                elif '기분 좋을' in emotion and '축하' in food_emotion:
-                    score += 3
-                # Add more heuristics as foods_v2 metadata gets richer
-            
-            # Companion Match
-            food_people = candidate.get('preferred_people', '')
-            if companion:
-                if '혼자' in companion and '혼자' in food_people:
-                    score += 3
-                elif '친구' in companion and '여럿' in food_people:
-                    score += 3
-                elif '가족' in companion and '다같이' in food_people:
-                    score += 3
-            
-            # Budget Match
-            food_price = candidate.get('price_per_serving', 0)
+                # ABSOLUTE MATCH: If the user explicitly chose this category, it takes precedence.
+                if preference in food_category or preference in food_heaviness:
+                    score += 100.0 # Massive priority boost for exact category match
+                
+                # Soft match against description or specific preference string
+                if preference in food_taste:
+                    pref_points += 25
+                
+                # Spicy/Heaviness match
+                if '매콤' in preference and candidate.get('spicy_level', 0) > 0:
+                    pref_points += 20
+                elif '든든' in preference and '무거운' in food_heaviness:
+                    pref_points += 20
+                elif '가벼운' in preference and '가벼운' in food_heaviness:
+                    pref_points += 20
+
+            # Budget check
             if budget:
-                if budget == '저렴' and food_price <= 10000:
-                    score += 4
-                elif budget == '보통' and 10000 < food_price <= 20000:
-                    score += 4
-                elif budget == '고급' and food_price > 20000:
-                    score += 4
-                
-            # --- 3. Context Match ---
+                if budget == '저렴' and food_price <= 12000: pref_points += 10
+                elif budget == '보통' and 12000 < food_price <= 25000: pref_points += 10
+                elif budget == '고급' and food_price > 25000: pref_points += 10
+            
+            score += min(50, pref_points)
+            
+            # --- 2. Nutrition Match (30% / Max 30 points) ---
+            nutri_points = 0.0
+            food_cal = candidate.get('calories', 0)
+            if food_cal > 0:
+                diff = abs(remaining_cal - food_cal)
+                # Perfect match (0 diff) -> 20 pts, diff of 500 -> 0 pts
+                cal_score = max(0, 20 - (diff / 25))
+                nutri_points += cal_score
+            
+            # Protein/Carb/Fat balance hint
+            # If target macro is high protein and food is high protein, add points
+            if goal == 'protein_high' and candidate.get('protein', 0) > 30:
+                nutri_points += 10
+            elif goal == 'weight_loss' and food_cal < 500:
+                nutri_points += 10
+            
+            score += min(30, nutri_points)
+            
+            # --- 3. Context Match (20% / Max 20 points) ---
+            context_points = 0.0
             food_weather = candidate.get('preferred_weather', '')
-            if '비' in weather and '비' in food_weather:
-                score += 2
-            elif '눈' in weather and '눈' in food_weather:
-                score += 2
-            elif '맑음' in weather and '맑음' in food_weather:
-                score += 2
+            food_emotion = candidate.get('emotion_state', '')
+            
+            # Weather match
+            if weather:
+                if weather in food_weather: context_points += 10
+                elif '비' in weather and '얼큰' in food_taste: context_points += 10
+            
+            # Emotion/Time match
+            if emotion and any(e in food_emotion for e in ['회복', '보상', '위로']):
+                context_points += 5
+            
+            if 11 <= hour <= 14: # Lunch
+                if '든든' in food_heaviness: context_points += 5
+            elif hour >= 20: # Late night
+                if '가벼운' in food_heaviness: context_points += 5
+            
+            score += min(20, context_points)
                 
-            # Randomness to break ties and introduce variety
-            score += np.random.uniform(0, 1)
+            # Randomness to break ties (minimal)
+            score += np.random.uniform(0, 0.5)
             
             candidate['score'] = score
             

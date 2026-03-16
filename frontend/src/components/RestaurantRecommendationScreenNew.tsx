@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserProfile, Screen } from '../App';
 import { MapPin, Star, ExternalLink, Check, ChevronLeft, ChevronRight, RefreshCw, Navigation, Car, MapPinned, ArrowRight, Sparkles, Zap, MessageCircle, X } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { RecommendationLoadingScreen } from './RecommendationLoadingScreen';
 import { FeedbackModal } from './FeedbackModal';
@@ -51,49 +51,7 @@ interface Restaurant {
   address: string;
 }
 
-const MOCK_RESTAURANTS: Restaurant[] = [
-  {
-    id: '1',
-    name: '밥도둑 제육볶음',
-    category: '한식',
-    distance: 0.3,
-    rating: 4.8,
-    reviewCount: 1247,
-    signature: '매콤한 제육볶음',
-    signatureCalories: 680,
-    price: '9,000원',
-    deliveryTime: '25-35분',
-    naverLink: 'https://map.naver.com',
-    baeminLink: 'https://www.baemin.com',
-    yogiyoLink: 'https://www.yogiyo.co.kr',
-    imageUrl: 'https://images.unsplash.com/photo-1624300629298-e9de39c13be5?w=400&h=300&fit=crop',
-    reason: '지금 주변에서 가장 인기있는 메뉴!',
-    protein: 38,
-    carbs: 75,
-    fat: 22,
-    address: '주변 위치 확인 중...',
-  },
-  {
-    id: '2',
-    name: '샐러디',
-    category: '샐러드',
-    distance: 0.5,
-    rating: 4.7,
-    reviewCount: 892,
-    signature: '닭가슴살 시저 샐러드',
-    signatureCalories: 320,
-    price: '12,000원',
-    deliveryTime: '20-30분',
-    naverLink: 'https://map.naver.com',
-    baeminLink: 'https://www.baemin.com',
-    imageUrl: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=300&fit=crop',
-    reason: '건강하고 가볍게!',
-    protein: 35,
-    carbs: 15,
-    fat: 12,
-    address: '주변 위치 확인 중...',
-  },
-];
+// Mock data removed as per request
 
 type QuestionStep = 'initial' | 'howMode' | 'dessertCategory' | 'emotion' | 'companion' | 'category' | 'preference' | 'budget' | 'loading' | 'result';
 
@@ -103,13 +61,21 @@ export function RestaurantRecommendationScreenNew({
   onNavigate,
   onLogMealToCalendar,
 }: RestaurantRecommendationScreenNewProps) {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>(() => {
+    const saved = sessionStorage.getItem('recommendation_results');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
 
   // Question flow states
-  const [questionStep, setQuestionStep] = useState<QuestionStep>('initial');
-  const [isQuickMode, setIsQuickMode] = useState(false);
+  const [questionStep, setQuestionStep] = useState<QuestionStep>(() => {
+    const saved = sessionStorage.getItem('recommendation_results');
+    return saved ? 'result' : 'initial';
+  });
+  const [isQuickMode, setIsQuickMode] = useState(() => {
+    return sessionStorage.getItem('recommendation_is_quick') === 'true';
+  });
   const [selectedMealType, setSelectedMealType] = useState<string>('');
   const [selectedDessertCategory, setSelectedDessertCategory] = useState<string>('');
   const [selectedEmotion, setSelectedEmotion] = useState<string>('');
@@ -117,6 +83,19 @@ export function RestaurantRecommendationScreenNew({
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
   const [selectedBudget, setSelectedBudget] = useState<string>('');
+  const [recommendOffset, setRecommendOffset] = useState(() => {
+    const saved = sessionStorage.getItem('recommendation_offset');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+
+  // Save to sessionStorage whenever relevant states change
+  useEffect(() => {
+    if (restaurants.length > 0) {
+      sessionStorage.setItem('recommendation_results', JSON.stringify(restaurants));
+      sessionStorage.setItem('recommendation_is_quick', isQuickMode.toString());
+      sessionStorage.setItem('recommendation_offset', recommendOffset.toString());
+    }
+  }, [restaurants, isQuickMode, recommendOffset]);
 
   // Feedback modal state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -195,7 +174,8 @@ export function RestaurantRecommendationScreenNew({
         emotionParam,
         companionParam,
         preferenceParam,
-        budgetParam
+        budgetParam,
+        recommendOffset
       );
 
       if (data && data.length > 0) {
@@ -204,14 +184,16 @@ export function RestaurantRecommendationScreenNew({
         return;
       } else {
         console.warn('추천 API에서 데이터가 반환되지 않았습니다.');
+        // If results are truly empty even after backend fallback
+        setRestaurants([]);
+        setQuestionStep('result');
       }
     } catch (err) {
       console.error('추천 API 호출 중 오류 발생:', err);
+      // In case of network error or timeout
+      setRestaurants([]);
+      setQuestionStep('result');
     }
-
-    // Fallback to mock data
-    setRestaurants(MOCK_RESTAURANTS);
-    setQuestionStep('result');
   };
 
   const handleQuickRecommendation = () => {
@@ -281,6 +263,10 @@ export function RestaurantRecommendationScreenNew({
       case 'result':
         setQuestionStep('initial');
         setRestaurants([]);
+        setRecommendOffset(0);
+        sessionStorage.removeItem('recommendation_results');
+        sessionStorage.removeItem('recommendation_is_quick');
+        sessionStorage.removeItem('recommendation_offset');
         break;
     }
   };
@@ -606,18 +592,41 @@ export function RestaurantRecommendationScreenNew({
     return <RecommendationLoadingScreen />;
   }
 
-  // Result Screen
   if (questionStep === 'result' && restaurants.length > 0) {
     return (
       <div 
-        className="flex flex-col w-full bg-white overflow-hidden shrink-0 relative"
-        style={{ height: '70vh', minHeight: '530px', border: '1px solid transparent' }}
+        className="flex flex-col w-full flex-1 bg-white overflow-hidden relative"
+        style={{ minHeight: 0 }}
       >
+        <div className="w-full flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white z-20">
+          <button 
+            onClick={() => {
+              setQuestionStep('initial');
+              setRestaurants([]);
+              setRecommendOffset(0);
+              sessionStorage.removeItem('recommendation_results');
+            }}
+            className="flex items-center gap-2 text-gray-500 hover:text-green-600 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            <span className="text-sm font-bold">다시 질문하기</span>
+          </button>
+          <div className="text-xs font-black text-gray-400 uppercase tracking-widest">
+            Recommendation Result
+          </div>
+        </div>
         <RestaurantRecommendationCardView
           restaurants={restaurants}
           onSelectRestaurant={handleOrderClick}
           onShowFeedback={(r) => { setFeedbackRestaurant(r); setShowFeedbackModal(true); }}
-          onRefresh={() => generateRecommendations(isQuickMode)}
+          onRefresh={() => {
+            setQuestionStep('initial');
+            setRestaurants([]);
+            setRecommendOffset(0);
+            sessionStorage.removeItem('recommendation_results');
+            sessionStorage.removeItem('recommendation_is_quick');
+            sessionStorage.removeItem('recommendation_offset');
+          }}
           onLike={async (r) => {
             try {
               await recommendService.recordInterest(userProfile.user_id, r.name, 'like');
@@ -662,8 +671,6 @@ export function RestaurantRecommendationScreenNew({
                     <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Navigation className="w-5 h-5 text-blue-500" /><span className="text-xs text-gray-500 font-medium">거리</span><span className="font-bold">{selectedRestaurant.distance}km</span></div>
                     <div className="bg-gray-50 p-3 rounded-2xl flex flex-col items-center"><Star className="w-5 h-5 text-yellow-500" /><span className="text-xs text-gray-500 font-medium">평점</span><span className="font-bold">{selectedRestaurant.rating}</span></div>
                   </div>
-                  
-                  {/* Macronutrients */}
                   <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
                     <p className="text-sm font-bold text-gray-800 mb-3 ml-1">영양 밸런스</p>
                     <div className="grid grid-cols-3 gap-2">
@@ -696,6 +703,27 @@ export function RestaurantRecommendationScreenNew({
           </DialogContent>
         </Dialog>
         {feedbackRestaurant && <FeedbackModal open={showFeedbackModal} onOpenChange={(open) => { setShowFeedbackModal(open); if (!open) setFeedbackRestaurant(null); }} restaurant={feedbackRestaurant} />}
+      </div>
+    );
+  }
+
+  // No results or Error Screen
+  if (questionStep === 'result' && restaurants.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center px-5 pb-20">
+        <div className="max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <X className="w-10 h-10 text-gray-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">추천 결과가 없습니다</h2>
+          <p className="text-base text-gray-600 mb-8">취향을 조금 다르게 선택해보시겠어요?</p>
+          <Button 
+            onClick={() => setQuestionStep('initial')}
+            className="w-full h-14 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold"
+          >
+            다시 시도하기
+          </Button>
+        </div>
       </div>
     );
   }

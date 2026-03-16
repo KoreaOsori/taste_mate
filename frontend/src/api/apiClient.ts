@@ -8,7 +8,7 @@ const API_BASE_URL =
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 20000,
+    timeout: 45000,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -132,9 +132,9 @@ export interface FoodSuggestion {
 }
 
 export const recommendService = {
-    getRecommendations: async (userId: string, lat?: number, lng?: number, weather?: string, hour?: number, emotion?: string, companion?: string, preference?: string, budget?: string) => {
+    getRecommendations: async (userId: string, lat?: number, lng?: number, weather?: string, hour?: number, emotion?: string, companion?: string, preference?: string, budget?: string, offset?: number) => {
         const response = await apiClient.get<Restaurant[]>(`/recommend/${userId}`, {
-            params: { lat, lng, weather, hour, emotion, companion, preference, budget },
+            params: { lat, lng, weather, hour, emotion, companion, preference, budget, offset },
         });
         return response.data;
     },
