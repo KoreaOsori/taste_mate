@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, MapPin, X, Heart, RefreshCcw, Info, Utensils } from 'lucide-react';
 
@@ -43,6 +43,7 @@ export function RestaurantRecommendationCardView({
 }: RestaurantRecommendationCardViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [exitX, setExitX] = useState<number | string>(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleSwipe = (direction: 'left' | 'right') => {
     // 단순히 카드만 넘기고, like/dislike는 별도 버튼으로만 처리
@@ -60,6 +61,10 @@ export function RestaurantRecommendationCardView({
   };
 
   const handleRefresh = () => {
+    // 짧은 피드백용 스피너 표시
+    setIsRefreshing(true);
+    setTimeout(() => setIsRefreshing(false), 700);
+
     if (onRefresh) {
       onRefresh();
     } else {
@@ -90,23 +95,6 @@ export function RestaurantRecommendationCardView({
   // 스와이프로 인한 이동이 이하면 "탭"으로 간주 → 상세 모달 열기 (드래그 시에는 click 이벤트가 안 뜨는 문제 보정)
   const TAP_THRESHOLD_PX = 40;
   const SWIPE_DISTANCE_PX = 80;
-
-  // 개발 편의를 위한 키보드 좌우 이동 (← NOPE / → LIKE)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (restaurants.length === 0) return;
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        handleSwipe('right');
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        handleSwipe('left');
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurants, currentIndex]);
 
   return (
     <div className="relative w-full h-full flex flex-col items-center bg-white overflow-hidden p-4 pt-3 min-h-0">
@@ -230,10 +218,12 @@ export function RestaurantRecommendationCardView({
         {/* Refresh */}
         <button
           onClick={handleRefresh}
-          className="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-gray-50 text-gray-400 hover:rotate-180 transition-all duration-500"
+          className={`w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-gray-50 text-gray-400 transition-all duration-500 ${
+            isRefreshing ? 'rotate-180' : 'hover:rotate-180'
+          }`}
           title="다시 추천받기"
         >
-          <RefreshCcw className="w-5 h-5" />
+          <RefreshCcw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
         </button>
 
         {/* Like - Slide Right */}
