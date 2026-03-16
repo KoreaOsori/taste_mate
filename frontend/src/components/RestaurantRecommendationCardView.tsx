@@ -56,12 +56,12 @@ export function RestaurantRecommendationCardView({
     setTimeout(() => {
       if (currentIndex < restaurants.length - 1) {
         setCurrentIndex(prev => prev + 1);
-        setExitX(0);
       } else {
-        // 모든 카드를 다 봤을 때 처리 (예: 처음으로 돌아가거나 새로고침 유도)
-        alert('모든 추천을 확인했습니다! 다시 추천받아보세요.');
-        onRefresh?.();
+        // 모든 카드를 다 봤을 때는 같은 추천 안에서 처음 카드로만 돌아가고,
+        // 실제 "다시 추천받기"는 중앙 새로고침 버튼을 눌렀을 때만 수행.
+        setCurrentIndex(0);
       }
+      setExitX(0);
     }, 200);
   };
 
@@ -98,7 +98,7 @@ export function RestaurantRecommendationCardView({
   const TAP_THRESHOLD_PX = 40;
 
   return (
-    <div className="relative w-full h-full flex flex-col items-center bg-white overflow-hidden p-4">
+    <div className="relative w-full h-full flex flex-col items-center bg-white overflow-hidden p-4 min-h-0">
       {/* Header */}
       <div className="w-full flex items-center justify-between px-2 mb-2 shrink-0">
         <h2 className="text-2xl font-black text-gray-900 tracking-tight">오늘의 추천</h2>
@@ -109,10 +109,9 @@ export function RestaurantRecommendationCardView({
         <span className="sr-only" data-ui-version="2.1-robust-inline"></span>
       </div>
 
-      {/* Card Container */}
+      {/* Card Container: flex-1 + min-h-0 으로 남은 높이만 차지해 하단 버튼/안내문이 잘리지 않게 */}
       <div 
-        className="relative w-full flex-1 max-w-md perspective-1000 my-2 z-10"
-        style={{ minHeight: '420px', display: 'flex' }}
+        className="relative w-full flex-1 min-h-0 max-w-md perspective-1000 my-2 z-10 flex flex-col"
       >
         <AnimatePresence mode='wait'>
           <motion.div
@@ -176,31 +175,33 @@ export function RestaurantRecommendationCardView({
 
               {/* 하단: 카드에는 거리·추천 사유·가격대만 (칼로리·대표메뉴는 클릭 시 세부 정보에) */}
               <div className="flex-1 overflow-y-auto p-4 pb-2 bg-white min-h-0">
-                <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex items-center gap-2 mb-2">
                   <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">
                     {currentRestaurant.category}
                   </span>
-                  <div className="items-center gap-1 text-amber-500 flex">
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight line-clamp-1 flex-1 min-w-0">
+                    {currentRestaurant.name}
+                  </h3>
+                  <div className="items-center gap-1 text-amber-500 flex shrink-0">
                     <Star className="w-3.5 h-3.5 fill-current" />
                     <span className="text-sm font-bold text-gray-800">{currentRestaurant.rating}</span>
                   </div>
                 </div>
-                <h3 className="text-xl font-black text-gray-900 tracking-tight line-clamp-1 mb-2">
-                  {currentRestaurant.name}
-                </h3>
-                <div className="flex items-start gap-1.5 mb-1 text-gray-600 text-sm">
+                <div className="flex items-center gap-3 mb-2 text-gray-600 text-base">
+                  <span><span className="text-gray-500 font-medium">거리</span> {currentRestaurant.distance}km</span>
+                  <span className="text-gray-300">·</span>
+                  <span><span className="text-gray-500 font-medium">예상가격</span> <span className="font-semibold text-gray-800">{currentRestaurant.price}</span></span>
+                </div>
+                <div className="flex items-start gap-1.5 mb-3 text-gray-600 text-sm min-h-[2.5rem]">
                   <MapPin className="w-4 h-4 shrink-0 text-green-600 mt-0.5" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-gray-500 font-semibold mb-0.5">식당 위치</p>
-                    <p className="text-gray-700 line-clamp-2">{currentRestaurant.address}</p>
+                    <p className="text-xs text-gray-500 font-semibold mb-1">식당 위치</p>
+                    <p className="text-gray-700 line-clamp-2">{currentRestaurant.address || '위치 정보 없음'}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mb-2 text-gray-600 text-sm">
-                  <span>{currentRestaurant.distance}km</span>
-                  <span className="text-gray-300">·</span>
-                  <span className="font-medium text-gray-800">{currentRestaurant.price}</span>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 mt-1">
                   <p className="text-xs text-gray-500 font-semibold mb-1">추천 사유</p>
                   <p className="text-sm text-gray-700 leading-relaxed">
                     {currentRestaurant.reason}
@@ -212,7 +213,7 @@ export function RestaurantRecommendationCardView({
       </div>
 
       {/* Action Buttons */}
-      <div className="w-full flex items-center justify-center gap-6 py-6 mt-auto shrink-0">
+      <div className="w-full flex items-center justify-center gap-6 py-4 mt-auto shrink-0">
         {/* Dislike - Slide Left */}
         <button
           onClick={() => handleSwipe('left')}
@@ -242,7 +243,7 @@ export function RestaurantRecommendationCardView({
       </div>
 
       {/* Mobile Hint */}
-      <div className="text-xs text-gray-400 font-medium animate-bounce mb-2">
+      <div className="text-xs text-gray-400 font-medium shrink-0 py-1">
         사진을 클릭하면 상세 정보를 볼 수 있어요!
       </div>
     </div>

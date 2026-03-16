@@ -425,12 +425,15 @@ async def generate_personalized_query_and_reasons(
                 f"현재 날씨: {weather}, 현재 시간: {hour}시\n"
                 f"사용자 기분: {user_qna.get('emotion', '응답없음')}, 동행: {user_qna.get('companion', '응답없음')}, 취향(맛): {user_qna.get('preference', '응답없음')}, 예산: {user_qna.get('budget', '응답없음')}\n\n"
                 f"추천 후보 리스트 (이 중에서만 선정):\n{candidates_info}\n\n"
-                "목표: 사용자의 상황에 가장 잘 맞는 1~3개의 메뉴를 선정하고, 네이버 맛집 검색어(query)와 60자 이내의 설득력 있는 정량적 조언(advice)을 작성하세요.\n"
+                "목표: 사용자의 상황(기분, 동행, 예산, 날씨)에 가장 잘 맞는 5개의 메뉴를 선정하고, \n"
+                "네이버 맛집 검색어(query)와 전체를 아우르는 짧은 한줄 설명(advice),\n"
+                "그리고 각 메뉴별로 25~40자 정도의 감성적인 한줄 추천 문구(reasons)를 작성하세요. 반드시 5개를 선정하세요.\n"
                 "규칙:\n"
                 + category_rule +
-                "1. 현재 날씨와 기분을 조언에 녹여내세요.\n"
-                "2. 남은 칼로리와 단백질 함량을 구체적으로 언급하며 추천 이유를 설명하세요.\n"
-                "형식: JSON 응답. {\"query\": \"선택된메뉴이름 주변맛집\", \"advice\": \"...\", \"selected_food_names\": [\"메뉴1\", \"메뉴2\"]}"
+                "1. 현재 날씨와 기분, 동행 정보를 조합해 '오늘 같은 날엔 ~', '혼자 먹기 딱 좋은' 같은 감성적인 표현을 사용하세요.\n"
+                "2. 칼로리/단백질 수치는 가볍게 한두 번만 언급하고, '얼큰하게', '담백하게', '기름지게', '기분 전환'처럼 사용자의 입맛과 감정을 자극하는 설명을 중심으로 쓰세요.\n"
+                "3. 각 메뉴별 추천 문구는 메뉴의 맛(매콤, 담백, 든든함 등)과 상황(점심/저녁, 혼밥/모임)을 자연스럽게 녹여주세요.\n"
+                "형식: JSON 응답. {\"query\": \"선택된메뉴이름 주변맛집\", \"advice\": \"...\", \"selected_food_names\": [\"메뉴1\", \"메뉴2\", \"메뉴3\", \"메뉴4\", \"메뉴5\"], \"reasons\": {\"메뉴1\": \"한줄설명\", ...}}"
             )
 
         completion = client.chat.completions.create(
@@ -447,17 +450,28 @@ async def generate_personalized_query_and_reasons(
             return result
 
         selected_names = result.get("selected_food_names", [])
-        selected_candidates = [c for c in top_candidates if c['name'] in selected_names]
+        # LLM이 고른 순서 유지: selected_names 순으로 top_candidates에서 매칭 (최대 5개)
+        name_to_candidate = {c["name"]: c for c in top_candidates}
+        selected_candidates = []
+        for name in selected_names[:5]:
+            if name in name_to_candidate and name_to_candidate[name] not in selected_candidates:
+                selected_candidates.append(name_to_candidate[name])
         
         if not selected_candidates:
-            selected_candidates = top_candidates[:3]
-            
-        result['candidates'] = selected_candidates
+            selected_candidates = top_candidates[:5]
+        
+        # reasons: 메뉴별 감성 한줄 설명 (없으면 호출부에서 fallback 생성)
+        reasons = result.get("reasons") or {}
+        if not isinstance(reasons, dict):
+            reasons = {}
+        result['reasons'] = reasons
+
+        result['candidates'] = selected_candidates[:5]
         return result
         
     except Exception as e:
         print(f"LLM generation error: {e}")
-        return {"query": top_candidates[0]['name'] if top_candidates else "맛집", "advice": "사용자 맞춤형 추천입니다.", "candidates": top_candidates[:3]}
+        return {"query": top_candidates[0]['name'] if top_candidates else "맛집", "advice": "사용자 맞춤형 추천입니다.", "candidates": top_candidates[:5]}
 
 @router.get("/address", response_model=dict)
 async def get_current_address(lat: float, lng: float):
@@ -539,7 +553,10 @@ async def get_recommendations(
     )
     
     query_text = llm_result.get("query", "맛집")
-    personal_advice = llm_result.get("advice", "오늘의 건강한 선택을 도와드릴게요.")
+    personal_advice = llm_result.get("advice", "오늘 기분에 딱 맞는 한 끼를 골라봤어요.")
+    llm_reasons = llm_result.get("reasons") or {}
+    if not isinstance(llm_reasons, dict):
+        llm_reasons = {}
     # 커피·디저트 플로우는 LLM이 candidates를 안 넘기므로, 랭킹된 side 후보를 그대로 사용
     selected_foods = llm_result.get("candidates", []) if not is_dessert_flow else top_candidates[:5]
 
@@ -570,17 +587,63 @@ async def get_recommendations(
     import asyncio
     results = []
     history_to_insert = []
-    # 위치 검색 시: 다른 시·도 결과 제외용 (예: 광주 사용자에게 대전 상호 안 나오게)
+
+    # 메뉴별 맞춤 추천 사유: LLM이 준 reasons를 우선 사용하고, 없으면 기분/동행/메뉴명을 섞어 감성적인 문구를 생성
+    reasons_by_food_name: dict[str, str] = {}
+    for food in display_foods:
+        fname = (food.get("name") or "").strip()
+        if not fname:
+            continue
+        if fname in llm_reasons:
+            reasons_by_food_name[fname] = str(llm_reasons[fname])[:60]
+        else:
+            mood = emotion or user_qna.get("emotion") or ""
+            comp = companion or user_qna.get("companion") or ""
+            base = personal_advice or "지금 컨디션에 잘 맞는 한 끼예요."
+            extra = ""
+            if mood:
+                extra = f" 오늘처럼 {mood} 날엔 '{fname}'가 딱 어울려요."
+            elif comp:
+                extra = f" {comp} 함께 먹기 좋은 메뉴예요."
+            reasons_by_food_name[fname] = (base + extra)[:60]
+    # 위치 검색 시: 다른 시·도/다른 광주(경기도 광주시 vs 광주광역시) 결과 제외용
+    # 예: "광주광역시 서구 치평동" -> "광주광역시 서구" 로 필터 (시/도 + 구 단위)
     def _region_filter_word(addr: str) -> str:
         if not addr or not addr.strip():
             return ""
-        first = addr.split()[0].strip()
-        for suffix in ["광역시", "특별시", "특별자치시", "도", "특별자치도"]:
-            if first.endswith(suffix):
-                return first[: -len(suffix)]
-        return first
+        parts = addr.split()
+        if len(parts) >= 2:
+            # "광주광역시 서구" / "서울특별시 강남구" / "경기도 성남시" 등
+            return f"{parts[0].strip()} {parts[1].strip()}".strip()
+        return parts[0].strip()
 
     region_filter = _region_filter_word(location_keyword) if location_keyword else ""
+
+    # 패스트푸드/커피 브랜드: 메뉴 검색 시 이 상호가 1등으로 나오면 스킵하고 다음 결과 사용
+    _SKIP_BRANDS = ("버거킹", "맥도날드", "롯데리아", "KFC", "킹스맥", "스타벅스", "이디야", "투썸", "빽다방", "메가커피", "컴포즈", "세븐일레븐", "GS25", "CU", "이마트", "홈플러스")
+
+    def _title_matches_food(item: dict, food_name: str, category: str) -> bool:
+        """식당 제목/카테고리/설명에 메뉴명 또는 관련 키워드가 있으면 True."""
+        title = (item.get("title") or "").replace("<b>", "").replace("</b>", "").lower()
+        desc = (item.get("description") or "").lower()
+        nav_cat = (item.get("category") or "").lower()
+        name_lower = (food_name or "").strip().lower()
+        cat_lower = (category or "").strip().lower()
+        if name_lower and (name_lower in title or name_lower in desc or name_lower in nav_cat):
+            return True
+        if cat_lower and cat_lower in title:
+            return True
+        # 메뉴명과 식당명에 공통 어근이 있으면 매칭 (예: 마라탕 ↔ 마라키친)
+        if name_lower and len(name_lower) >= 2:
+            for i in range(len(name_lower) - 1):
+                for j in range(i + 2, len(name_lower) + 1):
+                    sub = name_lower[i:j]
+                    if len(sub) >= 2 and sub in title:
+                        return True
+        return False
+
+    def _is_skip_brand(title: str) -> bool:
+        return any(b in title for b in _SKIP_BRANDS)
 
     async def find_restaurant_for_food(food, idx):
         # use_location: "[시·구·동] [메뉴명] 맛집" (주변). no location: "[메뉴명] 맛집" (비슷한 맛집만)
@@ -593,8 +656,10 @@ async def get_recommendations(
         print(f"[DEBUG] Searching for specific food: {search_query}")
         
         items = await search_naver_local(search_query)
+        used_fallback = False
         if not items:
             items = await search_naver_local(fallback_query)
+            used_fallback = True
         
         if not items:
             return None
@@ -606,10 +671,28 @@ async def get_recommendations(
         if not items:
             return None
         
-        # Pick the top result for this specific food
+        # 메뉴와 어울리지 않는 상호(패스트푸드/커피 브랜드) 스킵: 해당 메뉴 검색인데 1등이 브랜드면 다음 결과 사용
+        if not used_fallback:
+            while items and _is_skip_brand((items[0].get("title") or "").replace("<b>", "").replace("</b>", "")):
+                items = items[1:]
+        if not items:
+            return None
+        
+        food_name = food.get("name") or ""
+        food_cat = food.get("category") or "맛집"
+        # 메뉴명 검색이든 fallback이든: 식당 제목/카테고리/설명에 메뉴(또는 카테고리)가 들어간 결과를 우선 사용
+        matched = [i for i in items if _title_matches_food(i, food_name, food_cat)]
+        if matched:
+            items = matched
+            signature_display = food_name
+        else:
+            # 매칭되는 식당이 없어도 5개 유지를 위해 첫 결과 사용. 단, 해당 메뉴를 판다고 주장하지 않고 "{카테고리} 추천"으로 표시
+            signature_display = f"{food_cat} 추천"
         item = items[0]
         name = item.get("title", "").replace("<b>", "").replace("</b>", "")
-        address = (item.get("roadAddress") or item.get("address", "")) if use_location_search else ADDRESS_WHEN_NO_LOCATION
+        # 네이버 결과에 주소가 있으면 항상 표시(위치 미허용이어도 식당 위치는 보여줌). 없을 때만 안내 문구
+        raw_address = (item.get("roadAddress") or item.get("address") or "").strip()
+        address = raw_address if raw_address else ADDRESS_WHEN_NO_LOCATION
         naver_link = item.get("link", "https://map.naver.com")
         cat = food.get("category", "맛집")
         
@@ -639,6 +722,9 @@ async def get_recommendations(
             img_query = f"{name} {food['name']}"
             image_url = await search_naver_image(img_query, fallback_category=cat, menu_name=food.get('name'))
         
+        # 이 메뉴/식당 조합에 맞는 감성 추천 문구 선택
+        reason_text = reasons_by_food_name.get(food_name, personal_advice)
+
         return RestaurantRecommendation(
             id=f"rec_{idx}_{food['name']}",
             name=name,
@@ -646,13 +732,13 @@ async def get_recommendations(
             distance=distance_km,
             rating=rating,
             reviewCount=base.get("reviewCount", 100),
-            signature=food['name'],
+            signature=signature_display,
             signatureCalories=int(food.get("calories", 500)),
             price=f"{int(food.get('price_per_serving', 12000))}원" if food.get('price_per_serving') else base.get("price", "12,000원"),
             deliveryTime=base.get("deliveryTime", "20-30분"),
             naverLink=naver_link,
             imageUrl=image_url,
-            reason=personal_advice,
+            reason=reason_text,
             protein=float(food.get("protein", 20)),
             carbs=float(food.get("carbs", 50)),
             fat=float(food.get("fat", 15)),
@@ -661,13 +747,35 @@ async def get_recommendations(
             place_lng=place_lng_opt,
         )
 
-    # Process each recommended food in parallel to find matching restaurants
+    # Process each recommended food in parallel to find matching restaurants (최대 5개)
     tasks = [find_restaurant_for_food(food, i) for i, food in enumerate(display_foods[:5])]
     gathered_results = await asyncio.gather(*tasks)
     results = [r for r in gathered_results if r is not None]
 
+    # 정렬: 위치 검색 시 거리 가까운 순, 아니면 LLM/추천 순서 유지
+    if use_location_search and lat is not None and lng is not None:
+        results.sort(key=lambda r: r.distance)
+
+    # 주변 검색을 해봤는데도 결과가 0개인 경우:
+    # - 예전에는 서울 강남 테헤란로에 있는 DEFAULT_RECOMMENDATIONS 를 그대로 돌려줘서
+    #   광주 등 다른 지역 사용자에게도 강남 주소가 떠버리는 문제가 있었음.
+    # - 이제는 위치 기반 모드(use_location_search=True)에서는 같은 기본 카드라도
+    #   주소/좌표를 "현재 사용자의 행정동"으로 덮어써서 보여준다.
     if not results:
-        return [RestaurantRecommendation(**r) for r in DEFAULT_RECOMMENDATIONS]
+        # admin_address 는 use_location_search & lat/lng 있을 때만 정의됨 (없으면 None 처리)
+        user_addr = locals().get("admin_address") or DEFAULT_LOCATION_NAME
+        fallback: List[RestaurantRecommendation] = []
+        for idx, base in enumerate(DEFAULT_RECOMMENDATIONS[:5]):
+            payload = {**base}
+            payload["id"] = payload.get("id", f"default_{idx}")
+            # 위치 기반이면 주소/좌표를 사용자 근처로 맞춰 준다.
+            if use_location_search and lat is not None and lng is not None:
+                payload["address"] = user_addr
+                payload["place_lat"] = lat
+                payload["place_lng"] = lng
+                payload["distance"] = payload.get("distance", 0.5)
+            fallback.append(RestaurantRecommendation(**payload))
+        return fallback
 
     for rec in results:
         history_to_insert.append({

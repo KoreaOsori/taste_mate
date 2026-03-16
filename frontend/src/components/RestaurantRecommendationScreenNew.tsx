@@ -642,14 +642,14 @@ export function RestaurantRecommendationScreenNew({
           }}
         />
         <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
-          <DialogContent className="sm:max-w-md rounded-t-3xl p-0 overflow-hidden border-none max-h-[90vh] flex flex-col">
+          <DialogContent hideCloseButton className="sm:max-w-md rounded-t-3xl p-0 overflow-hidden border-none max-h-[90vh] flex flex-col">
             <DialogHeader className="p-0 shrink-0">
               <div className="relative h-36 w-full">
                 {selectedRestaurant && (
                   <>
                     <img src={selectedRestaurant.imageUrl} alt={selectedRestaurant.name} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                    <button onClick={() => setShowOrderModal(false)} className="absolute top-3 right-3 w-9 h-9 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center text-white"><X className="w-5 h-5" /></button>
+                    <button type="button" onClick={() => setShowOrderModal(false)} className="absolute top-3 right-3 z-10 w-10 h-10 bg-black/50 hover:bg-black/60 rounded-full flex items-center justify-center text-white shadow-lg" aria-label="닫기"><X className="w-5 h-5 stroke-[2.5]" strokeWidth={2.5} /></button>
                     <div className="absolute bottom-3 left-4 text-white text-left">
                       <span className="text-xs font-semibold text-green-300">{selectedRestaurant.category}</span>
                       <DialogTitle className="text-lg font-bold text-white leading-tight">{selectedRestaurant.name}</DialogTitle>
@@ -658,6 +658,11 @@ export function RestaurantRecommendationScreenNew({
                 )}
               </div>
             </DialogHeader>
+            {selectedRestaurant && (
+              <DialogDescription className="sr-only">
+                {selectedRestaurant.name} 상세: 대표 메뉴 {selectedRestaurant.signature}, 가격 {selectedRestaurant.price}, 거리 {selectedRestaurant.distance}km, 추천 사유
+              </DialogDescription>
+            )}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 min-h-0">
               {selectedRestaurant && (
                 <>
@@ -712,20 +717,31 @@ export function RestaurantRecommendationScreenNew({
                       <p className="text-sm text-gray-700 leading-snug break-words">{selectedRestaurant.address}</p>
                     </div>
                   </div>
-                  {/* 길찾기: 맵만 표시 */}
-                  {userLocation && selectedRestaurant.place_lat != null && selectedRestaurant.place_lng != null && (
-                    <div>
-                      <p className="text-xs font-bold text-gray-800 mb-2">길찾기</p>
-                      <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-100" style={{ height: 200 }}>
-                        <iframe
-                          title="길찾기 지도"
-                          src={`https://map.naver.com/v5/embed/directions/-/-/-/car?start=${userLocation.longitude},${userLocation.latitude}&goal=${selectedRestaurant.place_lng},${selectedRestaurant.place_lat}&pathType=1`}
-                          className="w-full h-full border-0"
-                          allowFullScreen
-                        />
-                      </div>
+                  {/* 길찾기: 네이버는 iframe 임베드 차단으로 새 탭 링크만 제공 */}
+                  <div>
+                    <p className="text-xs font-bold text-gray-800 mb-2">길찾기</p>
+                    <p className="text-xs text-gray-500 mb-2">지도 앱에서 경로를 확인하세요.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={selectedRestaurant.naverLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#03C75A] text-white rounded-xl text-sm font-bold hover:opacity-90"
+                      >
+                        <MapPin className="w-4 h-4" /> 네이버 지도에서 보기
+                      </a>
+                      {selectedRestaurant.place_lat != null && selectedRestaurant.place_lng != null && (
+                        <a
+                          href={`https://map.kakao.com/link/to/${encodeURIComponent(selectedRestaurant.name)},${selectedRestaurant.place_lat},${selectedRestaurant.place_lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#FEE500] text-[#191919] rounded-xl text-sm font-bold hover:opacity-90"
+                        >
+                          <MapPin className="w-4 h-4" /> 카카오맵 길찾기
+                        </a>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </>
               )}
             </div>
