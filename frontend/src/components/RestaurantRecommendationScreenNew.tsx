@@ -207,7 +207,8 @@ export function RestaurantRecommendationScreenNew({
       });
 
       if (data && data.length > 0) {
-        setRestaurants(data as unknown as Restaurant[]);
+        const list = data as unknown as Restaurant[];
+        setRestaurants(list);
         setQuestionStep('result');
         return;
       } else {
@@ -649,10 +650,25 @@ export function RestaurantRecommendationScreenNew({
                   <>
                     <img src={selectedRestaurant.imageUrl} alt={selectedRestaurant.name} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                    <button type="button" onClick={() => setShowOrderModal(false)} className="absolute top-3 right-3 z-10 w-10 h-10 bg-black/50 hover:bg-black/60 rounded-full flex items-center justify-center text-white shadow-lg" aria-label="닫기"><X className="w-5 h-5 stroke-[2.5]" strokeWidth={2.5} /></button>
-                    <div className="absolute bottom-3 left-4 text-white text-left">
-                      <span className="text-xs font-semibold text-green-300">{selectedRestaurant.category}</span>
-                      <DialogTitle className="text-lg font-bold text-white leading-tight">{selectedRestaurant.name}</DialogTitle>
+                    <button
+                      type="button"
+                      onClick={() => setShowOrderModal(false)}
+                      className="absolute top-3 right-3 z-10 w-10 h-10 bg-black/60 hover:bg-black/70 rounded-full flex items-center justify-center text-white shadow-lg"
+                      aria-label="닫기"
+                    >
+                      <X className="w-5 h-5 stroke-[2.5]" strokeWidth={2.5} />
+                    </button>
+                    <div className="absolute inset-x-0 bottom-0">
+                      <div className="w-full px-4 py-2.5 bg-gradient-to-t from-black/85 to-black/40">
+                        <div className="flex flex-col text-left max-w-[85%]">
+                          <span className="text-[11px] font-semibold text-green-300 mb-0.5">
+                            {selectedRestaurant.category}
+                          </span>
+                          <DialogTitle className="text-sm font-bold text-white leading-snug line-clamp-2">
+                            {selectedRestaurant.name}
+                          </DialogTitle>
+                        </div>
+                      </div>
                     </div>
                   </>
                 )}
@@ -722,20 +738,24 @@ export function RestaurantRecommendationScreenNew({
                     <p className="text-xs font-bold text-gray-800 mb-2">길찾기</p>
                     <p className="text-xs text-gray-500 mb-2">지도 앱에서 경로를 확인하세요.</p>
                     <div className="flex flex-wrap gap-2">
-                      <a
-                        href={selectedRestaurant.naverLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#03C75A] text-white rounded-xl text-sm font-bold hover:opacity-90"
-                      >
-                        <MapPin className="w-4 h-4" /> 네이버 지도에서 보기
-                      </a>
+                      {/* 네이버 지도 버튼: 링크가 유효할 때만 표시 */}
+                      {selectedRestaurant.naverLink && (
+                        <a
+                          href={selectedRestaurant.naverLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#03C75A] text-white rounded-xl text-sm font-bold hover:opacity-90"
+                        >
+                          <MapPin className="w-4 h-4" /> 네이버 지도에서 보기
+                        </a>
+                      )}
+                      {/* 카카오맵 버튼: 좌표가 있을 때만 표시 */}
                       {selectedRestaurant.place_lat != null && selectedRestaurant.place_lng != null && (
                         <a
                           href={`https://map.kakao.com/link/to/${encodeURIComponent(selectedRestaurant.name)},${selectedRestaurant.place_lat},${selectedRestaurant.place_lng}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#FEE500] text-[#191919] rounded-xl text-sm font-bold hover:opacity-90"
+                          className={`inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#FEE500] text-[#191919] rounded-xl text-sm font-bold hover:opacity-90 ${!selectedRestaurant.naverLink ? '' : ''}`}
                         >
                           <MapPin className="w-4 h-4" /> 카카오맵 길찾기
                         </a>

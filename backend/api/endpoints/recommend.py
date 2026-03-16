@@ -517,12 +517,13 @@ async def get_recommendations(
     target_cal = profile.get("target_calories", 2000) if profile else 2000
     consumed_cal = sum(m.get("calories", 0) for m in meals_data)
     
+    # 랭커에는 감정(emotion)을 넣지 않고, 순수하게 시간/날씨/칼로리/카테고리/예산 기반으로만 점수화.
+    # 감정은 아래 LLM 프롬프트와 추천 사유(reason)에만 반영한다.
     user_features = {
         'target_calories': target_cal,
         'consumed_calories': consumed_cal,
         'hour': current_hour,
         'weather': weather,
-        'emotion': emotion,
         'companion': companion,
         'preference': preference,
         'budget': budget,
@@ -531,20 +532,24 @@ async def get_recommendations(
     
     # 2. Fetch candidates & Rank (커피·디저트면 meal_role=side, food_group=음료 및 차류/빵 및 과자류만)
     all_candidates = get_foods_v2_candidates()
+    print(f"[DEBUG][recommend] foods_v2 all_candidates: {len(all_candidates)}")
     if is_dessert_flow:
         all_candidates = _filter_side_candidates(all_candidates, preference)
     if all_candidates:
         from models.ranker import RecommendationRanker
         ranker = RecommendationRanker()
         ranked_candidates = ranker.score_candidates(all_candidates, user_features)
+        print(f"[DEBUG][recommend] ranked_candidates: {len(ranked_candidates)}")
         # 사용자가 음식 종류를 선택했으면, 선정 후보는 선택한 종류만 넘김 (일식 등 비선택 종류 제외)
         if allowed_categories:
             filtered = [c for c in ranked_candidates if (c.get('category') or '').strip() in allowed_categories]
+            print(f"[DEBUG][recommend] allowed_categories={allowed_categories}, filtered={len(filtered)}")
             top_candidates = (filtered[:10] if filtered else ranked_candidates[:10])
         else:
             top_candidates = ranked_candidates[:10]
     else:
         top_candidates = []
+    print(f"[DEBUG][recommend] top_candidates: {len(top_candidates)}")
 
     # 3. LLM Logic (선택한 음식 종류만 선정하도록 user_qna에 전달)
     user_qna = {'emotion': emotion, 'companion': companion, 'preference': preference, 'budget': budget, 'categories': allowed_categories}
@@ -559,6 +564,8 @@ async def get_recommendations(
         llm_reasons = {}
     # 커피·디저트 플로우는 LLM이 candidates를 안 넘기므로, 랭킹된 side 후보를 그대로 사용
     selected_foods = llm_result.get("candidates", []) if not is_dessert_flow else top_candidates[:5]
+    print(f"[DEBUG][recommend] llm_result keys={list(llm_result.keys())}, candidates_len={len(llm_result.get('candidates', []) if isinstance(llm_result, dict) else [])}")
+    print(f"[DEBUG][recommend] selected_foods: {len(selected_foods)}, is_dessert_flow={is_dessert_flow}")
 
     # 4. Location-aware vs. "similar only" search
     # use_location=false: 위치 없음 → 지역 키워드 없이 메뉴명만 검색 (비슷한 맛집). 강남 기본값 사용 안 함.

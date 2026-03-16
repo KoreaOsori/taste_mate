@@ -98,9 +98,9 @@ export function RestaurantRecommendationCardView({
   const TAP_THRESHOLD_PX = 40;
 
   return (
-    <div className="relative w-full h-full flex flex-col items-center bg-white overflow-hidden p-4 min-h-0">
+    <div className="relative w-full h-full flex flex-col items-center bg-white overflow-hidden p-4 pt-3 min-h-0">
       {/* Header */}
-      <div className="w-full flex items-center justify-between px-2 mb-2 shrink-0">
+      <div className="w-full flex items-center justify-between px-2 mb-1 shrink-0">
         <h2 className="text-2xl font-black text-gray-900 tracking-tight">오늘의 추천</h2>
         <div className="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-sm">
           {currentIndex + 1} / {restaurants.length}
@@ -108,8 +108,12 @@ export function RestaurantRecommendationCardView({
         {/* Diagnostic Marker */}
         <span className="sr-only" data-ui-version="2.1-robust-inline"></span>
       </div>
+      {/* Hint */}
+      <div className="w-full text-[11px] text-gray-400 font-medium px-2 mb-1 shrink-0">
+        카드를 탭하면 상세 정보를 볼 수 있어요.
+      </div>
 
-      {/* Card Container: flex-1 + min-h-0 으로 남은 높이만 차지해 하단 버튼/안내문이 잘리지 않게 */}
+      {/* Card Container: flex-1 + min-h-0 으로 남은 높이만 차지해 하단 버튼이 잘리지 않게 */}
       <div 
         className="relative w-full flex-1 min-h-0 max-w-md perspective-1000 my-2 z-10 flex flex-col"
       >
@@ -134,13 +138,13 @@ export function RestaurantRecommendationCardView({
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ x: exitX, opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-            className="absolute inset-0 flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing border border-gray-100"
+            className="absolute inset-0 flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden cursor-pointer active:cursor-grabbing border border-gray-100"
+            onClick={() => onSelectRestaurant(currentRestaurant)}
           >
               {/* 상단: 이미지만 (비율 고정, 텍스트 없음 → 읽기 부담 감소) */}
               <div
                 className="relative w-full flex-shrink-0 bg-gray-100"
                 style={{ height: '38%' }}
-                onClick={() => onSelectRestaurant(currentRestaurant)}
               >
                 {currentRestaurant.imageUrl ? (
                   <img
@@ -175,8 +179,8 @@ export function RestaurantRecommendationCardView({
 
               {/* 하단: 카드에는 거리·추천 사유·가격대만 (칼로리·대표메뉴는 클릭 시 세부 정보에) */}
               <div className="flex-1 overflow-y-auto p-4 pb-2 bg-white min-h-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="bg-green-500 text-white px-2 py-0.5 rounded text-[11px] font-semibold tracking-wider">
                     {currentRestaurant.category}
                   </span>
                 </div>
@@ -242,10 +246,6 @@ export function RestaurantRecommendationCardView({
         </button>
       </div>
 
-      {/* Mobile Hint */}
-      <div className="text-xs text-gray-400 font-medium shrink-0 py-1">
-        사진을 클릭하면 상세 정보를 볼 수 있어요!
-      </div>
     </div>
   );
 }
