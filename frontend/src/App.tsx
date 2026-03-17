@@ -88,6 +88,8 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [todaysMeals, setTodaysMeals] = useState<Meal[]>([]);
+  /** 추천 탭이 재클릭될 때마다 +1 해서 RestaurantRecommendationScreenNew에서 reset을 트리거 */
+  const [restaurantResetKey, setRestaurantResetKey] = useState(0);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(() => {
     const saved = localStorage.getItem('tastemate_userLocation');
     if (saved) {
@@ -443,6 +445,7 @@ export default function App() {
             userProfile={userProfile}
             userLocation={userLocation}
             onNavigate={setCurrentScreen}
+            resetKey={restaurantResetKey}
             onLogMealToCalendar={(dateKey: string) => {
               setCalendarInitialDate(dateKey);
               setCurrentScreen('calendar');
@@ -497,7 +500,14 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => setCurrentScreen('restaurant')}
+              onClick={() => {
+                if (currentScreen === 'restaurant') {
+                  // 이미 추천 탭에 있을 때 재클릭 → 질문 첫 화면으로 리셋
+                  setRestaurantResetKey(k => k + 1);
+                } else {
+                  setCurrentScreen('restaurant');
+                }
+              }}
               className="flex flex-col items-center gap-1 px-3 py-2 rounded-full text-white bg-green-600 -mt-4 shadow-lg"
             >
               <Utensils className="w-7 h-7" />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UserProfile, Screen } from '../App';
 import { MapPin, Star, ExternalLink, Check, ChevronLeft, ChevronRight, RefreshCw, Navigation, Car, MapPinned, ArrowRight, Sparkles, Zap, MessageCircle, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -27,6 +27,8 @@ interface RestaurantRecommendationScreenNewProps {
   userLocation?: { latitude: number; longitude: number } | null;
   onNavigate: (screen: Screen) => void;
   onLogMealToCalendar?: (dateKey: string) => void;
+  /** 추천 탭이 다시 클릭될 때 App.tsx가 직접 바꺽니다. 값이 바뀐면 질문 첫 화면으로 리셋. */
+  resetKey?: number;
 }
 
 interface Restaurant {
@@ -53,49 +55,7 @@ interface Restaurant {
   place_lng?: number | null;
 }
 
-const MOCK_RESTAURANTS: Restaurant[] = [
-  {
-    id: '1',
-    name: '밥도둑 제육볶음',
-    category: '한식',
-    distance: 0.3,
-    rating: 4.8,
-    reviewCount: 1247,
-    signature: '매콤한 제육볶음',
-    signatureCalories: 680,
-    price: '9,000원',
-    deliveryTime: '25-35분',
-    naverLink: 'https://map.naver.com',
-    baeminLink: 'https://www.baemin.com',
-    yogiyoLink: 'https://www.yogiyo.co.kr',
-    imageUrl: 'https://images.unsplash.com/photo-1624300629298-e9de39c13be5?w=400&h=300&fit=crop',
-    reason: '지금 주변에서 가장 인기있는 메뉴!',
-    protein: 38,
-    carbs: 75,
-    fat: 22,
-    address: '주변 위치 확인 중...',
-  },
-  {
-    id: '2',
-    name: '샐러디',
-    category: '샐러드',
-    distance: 0.5,
-    rating: 4.7,
-    reviewCount: 892,
-    signature: '닭가슴살 시저 샐러드',
-    signatureCalories: 320,
-    price: '12,000원',
-    deliveryTime: '20-30분',
-    naverLink: 'https://map.naver.com',
-    baeminLink: 'https://www.baemin.com',
-    imageUrl: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=300&fit=crop',
-    reason: '건강하고 가볍게!',
-    protein: 35,
-    carbs: 15,
-    fat: 12,
-    address: '주변 위치 확인 중...',
-  },
-];
+// Mock data removed to ensure real API data usage
 
 type QuestionStep = 'initial' | 'howMode' | 'dessertCategory' | 'emotion' | 'companion' | 'category' | 'preference' | 'budget' | 'loading' | 'result';
 
@@ -104,21 +64,110 @@ export function RestaurantRecommendationScreenNew({
   userLocation,
   onNavigate,
   onLogMealToCalendar,
+  resetKey,
 }: RestaurantRecommendationScreenNewProps) {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  // sessionStorage로 이전 추천 결과 복원 (탭 이탈 후 재진입 대비)
+  // sessionStorage로 이전 추천 결과 및 진행 상태 완벽 복원
+  const [restaurants, setRestaurants] = useState<Restaurant[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('recommendation_results');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
 
   // Question flow states
-  const [questionStep, setQuestionStep] = useState<QuestionStep>('initial');
-  const [isQuickMode, setIsQuickMode] = useState(false);
-  const [selectedMealType, setSelectedMealType] = useState<string>('');
-  const [selectedDessertCategory, setSelectedDessertCategory] = useState<string>('');
-  const [selectedEmotion, setSelectedEmotion] = useState<string>('');
-  const [selectedCompanion, setSelectedCompanion] = useState<string>('');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
-  const [selectedBudget, setSelectedBudget] = useState<string>('');
+  const [questionStep, setQuestionStep] = useState<QuestionStep>(() => {
+    try {
+      const savedStep = sessionStorage.getItem('recommendation_step');
+      // [v2.2] loading 상태로 저장된 경우 initial로 복구해 멈춤 현상 방지
+      if (savedStep && savedStep !== 'loading') return savedStep as QuestionStep;
+      
+      const savedResults = sessionStorage.getItem('recommendation_results');
+      if (savedResults && JSON.parse(savedResults).length > 0) return 'result';
+      
+      return 'initial';
+    } catch { return 'initial'; }
+  });
+  const [isQuickMode, setIsQuickMode] = useState(() => {
+    try { return sessionStorage.getItem('recommendation_is_quick') === 'true'; }
+    catch { return false; }
+  });
+  
+  // 상태 저장을 위한 보조 상태들 (필요 시 복원 가능하도록 sessionStorage 연동)
+  const [selectedMealType, setSelectedMealType] = useState<string>(() => sessionStorage.getItem('rec_meal_type') || '');
+  const [selectedDessertCategory, setSelectedDessertCategory] = useState<string>(() => sessionStorage.getItem('rec_dessert_cat') || '');
+  const [selectedEmotion, setSelectedEmotion] = useState<string>(() => sessionStorage.getItem('rec_emotion') || '');
+  const [selectedCompanion, setSelectedCompanion] = useState<string>(() => sessionStorage.getItem('rec_companion') || '');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('rec_categories');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [selectedPreferences, setSelectedPreferences] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('rec_preferences');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [selectedBudget, setSelectedBudget] = useState<string>(() => sessionStorage.getItem('rec_budget') || '');
+
+  // sessionStorage 동기화 — 모든 진행 상태 보존
+  useEffect(() => {
+    try {
+      if (restaurants.length > 0) {
+        sessionStorage.setItem('recommendation_results', JSON.stringify(restaurants));
+      }
+      sessionStorage.setItem('recommendation_step', questionStep);
+      sessionStorage.setItem('recommendation_is_quick', isQuickMode.toString());
+      sessionStorage.setItem('rec_meal_type', selectedMealType);
+      sessionStorage.setItem('rec_dessert_cat', selectedDessertCategory);
+      sessionStorage.setItem('rec_emotion', selectedEmotion);
+      sessionStorage.setItem('rec_companion', selectedCompanion);
+      sessionStorage.setItem('rec_categories', JSON.stringify(selectedCategories));
+      sessionStorage.setItem('rec_preferences', JSON.stringify(selectedPreferences));
+      sessionStorage.setItem('rec_budget', selectedBudget);
+    } catch (e) {
+      console.error('Failed to save session state:', e);
+    }
+  }, [restaurants, questionStep, isQuickMode, selectedMealType, selectedDessertCategory, selectedEmotion, selectedCompanion, selectedCategories, selectedPreferences, selectedBudget]);
+
+  // resetKey 변경 시(추천 탭 재클릭) 질문 첫 화면으로 리셋
+  // [v2.2/v4.0] resetKey가 이전과 다르고 0보다 클 때만 리셋 (마운트 시 자동 리셋 방지)
+  const prevResetKey = useRef(resetKey);
+  useEffect(() => {
+    if (!resetKey || resetKey === 0 || resetKey === prevResetKey.current) {
+      prevResetKey.current = resetKey;
+      return;
+    }
+    
+    prevResetKey.current = resetKey;
+    setQuestionStep('initial');
+    setRestaurants([]);
+    setIsQuickMode(false);
+    setSelectedMealType('');
+    setSelectedDessertCategory('');
+    setSelectedEmotion('');
+    setSelectedCompanion('');
+    setSelectedCategories([]);
+    setSelectedPreferences([]);
+    setSelectedBudget('');
+    
+    try {
+      sessionStorage.removeItem('recommendation_results');
+      sessionStorage.removeItem('recommendation_step');
+      sessionStorage.removeItem('recommendation_is_quick');
+      sessionStorage.removeItem('rec_meal_type');
+      sessionStorage.removeItem('rec_dessert_cat');
+      sessionStorage.removeItem('rec_emotion');
+      sessionStorage.removeItem('rec_companion');
+      sessionStorage.removeItem('rec_categories');
+      sessionStorage.removeItem('rec_preferences');
+      sessionStorage.removeItem('rec_budget');
+    } catch (e) {}
+  }, [resetKey]);
 
   // Feedback modal state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -212,14 +261,15 @@ export function RestaurantRecommendationScreenNew({
         return;
       } else {
         console.warn('추천 API에서 데이터가 반환되지 않았습니다.');
+        setRestaurants([]); // 결과 없음 UI 유도
+        setQuestionStep('result');
+        return;
       }
     } catch (err) {
       console.error('추천 API 호출 중 오류 발생:', err);
+      setRestaurants([]); // 오류 시에도 빈 상태로 결과 화면 진입하여 안내 문구 노출
+      setQuestionStep('result');
     }
-
-    // Fallback to mock data
-    setRestaurants(MOCK_RESTAURANTS);
-    setQuestionStep('result');
   };
 
   const handleQuickRecommendation = () => {
@@ -615,14 +665,66 @@ export function RestaurantRecommendationScreenNew({
   }
 
   // Result Screen
-  if (questionStep === 'result' && restaurants.length > 0) {
+  if (questionStep === 'result') {
+    if (restaurants.length === 0) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50">
+          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mb-6">
+            <MapPin className="w-10 h-10 text-amber-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">주변에 추천할 만한<br/>음식점이 없어요 😢</h2>
+          <p className="text-gray-600 mb-8 leading-relaxed">
+            거리 제한(10km) 내에 선택하신 조건과 딱 맞는<br/>
+            맛집을 찾지 못했습니다. 조건을 조금 바꾸거나<br/>
+            다시 한 번 추천을 받아보시겠어요?
+          </p>
+          <div className="flex flex-col w-full gap-3">
+            <button
+              onClick={() => {
+                setQuestionStep('initial');
+                setRestaurants([]);
+              }}
+              className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all"
+            >
+              다시 추천받기
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const getThemeInfo = () => {
+      const hour = new Date().getHours();
+      let themeId: 'morning' | 'afternoon' | 'evening' | 'night' = 'afternoon';
+      let themeClass = 'bg-white';
+
+      if (hour >= 5 && hour < 11) {
+        themeId = 'morning';
+        themeClass = 'bg-gradient-to-br from-orange-50 to-amber-50';
+      } else if (hour >= 11 && hour < 17) {
+        themeId = 'afternoon';
+        themeClass = 'bg-white';
+      } else if (hour >= 17 && hour < 21) {
+        themeId = 'evening';
+        themeClass = 'bg-gradient-to-br from-orange-100 to-rose-50';
+      } else {
+        themeId = 'night';
+        themeClass = 'bg-gradient-to-br from-slate-900 to-indigo-950';
+      }
+      
+      return { id: themeId, class: themeClass };
+    };
+
+    const currentTheme = getThemeInfo();
+
     return (
       <div 
-        className="flex flex-col w-full bg-white overflow-hidden shrink-0 relative"
-        style={{ height: '70vh', minHeight: '530px', border: '1px solid transparent' }}
+        className={`flex flex-col w-full flex-1 overflow-hidden relative transition-colors duration-1000 ${currentTheme.class}`}
+        style={{ minHeight: 0 }}
       >
         <RestaurantRecommendationCardView
           restaurants={restaurants}
+          theme={currentTheme.id}
           onSelectRestaurant={handleOrderClick}
           onShowFeedback={(r) => { setFeedbackRestaurant(r); setShowFeedbackModal(true); }}
           onRefresh={() => generateRecommendations(isQuickMode)}

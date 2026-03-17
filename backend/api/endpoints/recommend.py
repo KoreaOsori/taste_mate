@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 import os
 import httpx
 import math
+import asyncio
 from datetime import datetime
 
 router = APIRouter()
@@ -116,13 +117,14 @@ CATEGORY_FALLBACK_IMAGES = {
     "default": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=800"
 }
 
-async def search_naver_image(query: str, fallback_category: str = "default", menu_name: Optional[str] = None) -> str:
+async def search_naver_image(query: str, fallback_category: str = "default", menu_name: Optional[str] = None, address_hint: Optional[str] = None) -> str:
     """
-    Search Naver Image API. menu_name이 있으면 메뉴와 이미지 매칭을 위해 메뉴명 위주로 먼저 검색.
+    Search Naver Image API.
+    검색 전략: 실제 매장, 방문자 리뷰 사진 위주로 우선 탐색하되, 결과가 없으면 점진적으로 조건을 완화하여 범용 음식 사진이라도 가져옴 (기본 이미지 노출 최소화).
     """
     client_id = os.environ.get("NAVER_CLIENT_ID", "")
     client_secret = os.environ.get("NAVER_CLIENT_SECRET", "")
-    
+
     if not client_id or not client_secret:
         return CATEGORY_FALLBACK_IMAGES.get(fallback_category, CATEGORY_FALLBACK_IMAGES["default"])
 
@@ -131,31 +133,52 @@ async def search_naver_image(query: str, fallback_category: str = "default", men
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(
                     "https://openapi.naver.com/v1/search/image.json",
-                    params={"query": q, "display": 1, "sort": "sim", "filter": "medium"},
+                    params={"query": q, "display": 10, "sort": "sim", "filter": "medium"},
                     headers={"X-Naver-Client-Id": client_id, "X-Naver-Client-Secret": client_secret},
                 )
                 if response.status_code == 200:
                     items = response.json().get("items", [])
-                    if items:
-                        return items[0].get("link")
+                    for item in items:
+                        link = item.get("link", "")
+                        # 인스타그램 등 외부 링크 차단이 심한 CDN 필터링
+                        if "scontent" in link or "instagram" in link or "fbcdn" in link:
+                            continue
+                        if link:
+                            return link
         except Exception as e:
             print(f"[DEBUG] Naver Image fetch error for '{q}': {e}")
         return None
 
-    # Step 1: 메뉴명 위주 검색 — 추천 메뉴(쏨땀, 제육볶음 등)와 이미지가 맞도록
-    if menu_name and menu_name.strip():
-        img = await fetch(f"{menu_name.strip()} 음식")
-        if img: return img
-        img = await fetch(menu_name.strip())
-        if img: return img
-    # Step 2: 식당명 + 메뉴명
-    img = await fetch(query)
-    if img: return img
-    # Step 3: 식당명 + 대표메뉴
     restaurant_name = query.split(' ')[0]
-    img = await fetch(f"{restaurant_name} 대표메뉴")
+    raw_menu = (menu_name or "").strip()
+    # 메뉴명에서 '추천' 같은 불필요한 단어 제거 (예: "아시안 추천" -> "아시안")
+    menu = raw_menu.replace("추천", "").replace("관련", "").strip()
+    
+    noise_filter = "-대회 -소식 -공지 -안내 -행사 -이벤트 -응원 -축구 -야구 -스포츠 -리뷰이벤트 -모집 -레시피 -만들기 -홈메이드 -배달의민족 -요기요 -쿠팡이츠"
+
+    # 지역 추출 (구/동 단위)
+    region = ""
+    if address_hint:
+        parts = address_hint.split()
+        if len(parts) >= 3:
+            region = " ".join(parts[2:4])
+        elif len(parts) >= 2:
+            region = parts[-1]
+
+    # ── Step 1: [식당명 + 메뉴] 가장 구체적인 메뉴 상세 사진
+    if menu:
+        img = await fetch(f"{region} {restaurant_name} {menu} 방문자 리뷰 사진 {noise_filter}")
+        if img: return img
+        img = await fetch(f"{restaurant_name} {menu} 사진 {noise_filter}")
+        if img: return img
+
+    # ── Step 2: [식당명 + 매장] 매장 내부/외부 장소 사진
+    img = await fetch(f"{region} {restaurant_name} 매장 내부 외부 업체사진 {noise_filter}")
     if img: return img
-    # Step 4: 카테고리 폴백
+    img = await fetch(f"{restaurant_name} 매장 사진 {noise_filter}")
+    if img: return img
+
+    # ── Step 3: [카테고리 대표 이미지] 엉뚱한 이미지 방지용 엄격한 Fallback
     return CATEGORY_FALLBACK_IMAGES.get(fallback_category, CATEGORY_FALLBACK_IMAGES["default"])
 
 async def get_google_place_photo(place_name: str, address: str) -> Optional[str]:
@@ -426,14 +449,14 @@ async def generate_personalized_query_and_reasons(
                 f"사용자 기분: {user_qna.get('emotion', '응답없음')}, 동행: {user_qna.get('companion', '응답없음')}, 취향(맛): {user_qna.get('preference', '응답없음')}, 예산: {user_qna.get('budget', '응답없음')}\n\n"
                 f"추천 후보 리스트 (이 중에서만 선정):\n{candidates_info}\n\n"
                 "목표: 사용자의 상황(기분, 동행, 예산, 날씨)에 가장 잘 맞는 5개의 메뉴를 선정하고, \n"
-                "네이버 맛집 검색어(query)와 전체를 아우르는 짧은 한줄 설명(advice),\n"
+                "네이버 맛집 검색어(query)와 60자 이내의 설득력 있는 전체 설명(advice),\n"
                 "그리고 각 메뉴별로 25~40자 정도의 감성적인 한줄 추천 문구(reasons)를 작성하세요. 반드시 5개를 선정하세요.\n"
                 "규칙:\n"
                 + category_rule +
                 "1. 현재 날씨와 기분, 동행 정보를 조합해 '오늘 같은 날엔 ~', '혼자 먹기 딱 좋은' 같은 감성적인 표현을 사용하세요.\n"
-                "2. 칼로리/단백질 수치는 가볍게 한두 번만 언급하고, '얼큰하게', '담백하게', '기름지게', '기분 전환'처럼 사용자의 입맛과 감정을 자극하는 설명을 중심으로 쓰세요.\n"
+                "2. advice 본문은 무조건 공백 포함 60자를 넘지 않도록 극도로 설득력 있고 간결하게 작성하세요.\n"
                 "3. 각 메뉴별 추천 문구는 메뉴의 맛(매콤, 담백, 든든함 등)과 상황(점심/저녁, 혼밥/모임)을 자연스럽게 녹여주세요.\n"
-                "형식: JSON 응답. {\"query\": \"선택된메뉴이름 주변맛집\", \"advice\": \"...\", \"selected_food_names\": [\"메뉴1\", \"메뉴2\", \"메뉴3\", \"메뉴4\", \"메뉴5\"], \"reasons\": {\"메뉴1\": \"한줄설명\", ...}}"
+                "형식: JSON 응답. {\"query\": \"선택된메뉴이름 주변맛집\", \"advice\": \"60자 이내의 설득력 있는 설명\", \"selected_food_names\": [\"메뉴1\", \"메뉴2\", \"메뉴3\", \"메뉴4\", \"메뉴5\"], \"reasons\": {\"메뉴1\": \"한줄설명\", ...}}"
             )
 
         completion = client.chat.completions.create(
@@ -479,6 +502,247 @@ async def get_current_address(lat: float, lng: float):
     address = await get_address_from_coords(lat, lng)
     return {"address": address}
 
+# 위치 검색 시: 다른 시·도/다른 광주(경기도 광주시 vs 광주광역시) 결과 제외용
+# 예: "광주광역시 서구 치평동" -> "광주광역시 서구" 로 필터 (시/도 + 구 단위)
+def _region_filter_word(addr: str) -> str:
+    """지역 필터용 단어 추출 (예: '경상남도 창원시' -> '경남 창원시'로 정규화)"""
+    if not addr or not addr.strip():
+        return ""
+    
+    # 광역 자치단체 명칭 정규화 매핑
+    PROVINCE_MAP = {
+        "경상남도": "경남", "경상북도": "경북",
+        "전라남도": "전남", "전라북도": "전북", "전북특별자치도": "전북",
+        "충청남도": "충남", "충청북도": "충북",
+        "강원도": "강원", "강원특별자치도": "강원",
+        "제주특별자치도": "제주", "제주도": "제주"
+    }
+    
+    parts = addr.split()
+    if not parts:
+        return ""
+        
+    p1 = PROVINCE_MAP.get(parts[0], parts[0])
+    
+    if len(parts) >= 2:
+        return f"{p1} {parts[1]}".strip()
+    return p1.strip()
+
+# 패스트푸드/커피 브랜드: 메뉴 검색 시 이 상호가 1등으로 나오면 스킵하고 다음 결과 사용
+_SKIP_BRANDS = ("버거킹", "맥도날드", "롯데리아", "KFC", "킹스맥", "스타벅스", "이디야", "투썸", "빽다방", "메가커피", "컴포즈", "세븐일레븐", "GS25", "CU", "이마트", "홈플러스")
+
+def _title_matches_food(item: dict, food_name: str, category: str) -> bool:
+    """식당 제목/카테고리/설명에 메뉴명 또는 관련 키워드가 있으면 True."""
+    title = (item.get("title") or "").replace("<b>", "").replace("</b>", "").lower()
+    desc = (item.get("description") or "").lower()
+    nav_cat = (item.get("category") or "").lower()
+    name_lower = (food_name or "").strip().lower()
+    cat_lower = (category or "").strip().lower()
+    if name_lower and (name_lower in title or name_lower in desc or name_lower in nav_cat):
+        return True
+    if cat_lower and cat_lower in title:
+        return True
+    # 메뉴명과 식당명에 공통 어근이 있으면 매칭 (예: 마라탕 ↔ 마라키친)
+    if name_lower and len(name_lower) >= 2:
+        for i in range(len(name_lower) - 1):
+            for j in range(i + 2, len(name_lower) + 1):
+                sub = name_lower[i:j]
+                if len(sub) >= 2 and sub in title:
+                    return True
+    return False
+
+def _is_skip_brand(title: str) -> bool:
+    return any(b in title for b in _SKIP_BRANDS)
+
+async def find_restaurant_for_food(
+    idx: int,
+    food: Dict,
+    lat: Optional[float],
+    lng: Optional[float],
+    use_location_search: bool,
+    personal_advice: str,
+    reasons_by_food_name: Dict,
+    location_keyword: str,
+    region_filter: str,
+    distance_limit: float = 10.0
+) -> Optional[RestaurantRecommendation]:
+    # use_location: "[시·구·동] [메뉴명] 맛집" (주변). no location: "[메뉴명] 맛집" (비슷한 맛집만)
+    if location_keyword:
+        search_query = f"{location_keyword} {food['name']} 맛집"
+        fallback_query = f"{location_keyword} {food.get('category', '맛집')}"
+    else:
+        search_query = f"{food['name']} 맛집"
+        fallback_query = f"{food.get('category', '맛집')} 맛집"
+    
+    print(f"[DEBUG] Searching for: '{search_query}' (Location: {location_keyword})")
+    
+    # API 키 체크 (마스킹)
+    cid = os.environ.get("NAVER_CLIENT_ID", "")
+    if not cid:
+        print("[ERROR] NAVER_CLIENT_ID is missing!")
+    
+    # 시·도 명칭 정규화 및 공백 정규화 후 매칭
+    def normalize_addr(s):
+        if not s: return ""
+        # 1. 광역 단체명 축약
+        s = s.replace("경상남도", "경남").replace("경상북도", "경북")
+        s = s.replace("전라남도", "전남").replace("전라북도", "전북").replace("전북특별자치도", "전북")
+        s = s.replace("충청남도", "충남").replace("충청북도", "충북")
+        s = s.replace("강원특별자치도", "강원").replace("강원도", "강원")
+        s = s.replace("제주특별자치도", "제주").replace("제주도", "제주")
+        # 2. 불필요한 공백 제거 및 단일 공백화
+        import re
+        s = re.sub(r'\s+', ' ', s).strip()
+        return s
+        
+    norm_region = normalize_addr(region_filter) if region_filter else ""
+    # 유연한 매칭을 위한 토큰 분리 (예: ['경남', '창원시'])
+    region_tokens = [t for t in norm_region.split() if len(t) > 1] # 1글자(예: '시')는 제외하고 의미있는 토큰만
+
+    def filter_by_region(items_list):
+        if not region_filter or not region_tokens: return items_list
+        filtered = []
+        for i in items_list:
+            raw_addr = (i.get("address") or "") + " " + (i.get("roadAddress") or "")
+            combined_addr = normalize_addr(raw_addr)
+            
+            # 모든 토큰이 포함되어 있는지 확인 (순서 무관, 공백 무관)
+            match_all = True
+            for token in region_tokens:
+                if token not in combined_addr:
+                    match_all = False
+                    break
+            
+            if match_all:
+                filtered.append(i)
+            else:
+                print(f"[REGION_SKIP] '{i.get('title')}' at '{raw_addr}' (Norm: '{combined_addr}') missing tokens from '{region_tokens}'")
+        return filtered
+
+    # 1. 1차 시도: 전체 주소 + 메뉴명
+    items = await search_naver_local(search_query)
+    print(f"[DEBUG] Naver Local Search found {len(items)} items for query: '{search_query}'")
+    items = filter_by_region(items)
+    
+    # 2. 결과가 없으면 요약 쿼리 (구/동 + 메뉴명)
+    if not items and location_keyword:
+        parts = location_keyword.split()
+        if len(parts) >= 2:
+            short_query = f"{parts[-1]} {food['name']} 맛집"
+            print(f"[DEBUG] No local results. Trying concise query: {short_query}")
+            raw_fallback = await search_naver_local(short_query)
+            items = filter_by_region(raw_fallback)
+            print(f"[DEBUG] Concise query found {len(items)} items after filter.")
+            
+    # 3. 그래도 없으면 카테고리 기반 폴백
+    used_fallback = False
+    if not items:
+        print(f"[DEBUG] Still no results. Trying category fallback: {fallback_query}")
+        raw_fallback = await search_naver_local(fallback_query)
+        items = filter_by_region(raw_fallback)
+        used_fallback = True
+        
+    if not items:
+        print(f"[REJECT] All search attempts failed or were filtered out by region check for {food['name']}")
+        return None
+
+    # 메뉴와 어울리지 않는 상호(패스트푸드/커피 브랜드) 스킵: 해당 메뉴 검색인데 1등이 브랜드면 다음 결과 사용
+    if not used_fallback:
+        while items and _is_skip_brand((items[0].get("title") or "").replace("<b>", "").replace("</b>", "")):
+            items = items[1:]
+    if not items:
+        return None
+
+    food_name = food.get("name") or ""
+    food_cat = food.get("category") or "맛집"
+    # 메뉴명 검색이든 fallback이든: 식당 제목/카테고리/설명에 메뉴(또는 카테고리)가 들어간 결과를 우선 사용
+    matched = [i for i in items if _title_matches_food(i, food_name, food_cat)]
+    if matched:
+        items = matched
+        signature_display = food_name
+    else:
+        # 매칭되는 식당이 없어도 5개 유지를 위해 첫 결과 사용. 단, 해당 메뉴를 판다고 주장하지 않고 "{카테고리} 추천"으로 표시
+        signature_display = f"{food_cat} 추천"
+    item = items[0]
+    name = item.get("title", "").replace("<b>", "").replace("</b>", "")
+    # 네이버 결과에 주소가 있으면 항상 표시(위치 미허용이어도 식당 위치는 보여줌). 없을 때만 안내 문구
+    raw_address = (item.get("roadAddress") or item.get("address") or "").strip()
+    address = raw_address if raw_address else ADDRESS_WHEN_NO_LOCATION
+    naver_link = item.get("link", "https://map.naver.com")
+    cat = food.get("category", "맛집")
+
+    # [v4.0] 병렬 처리 개선: 이미지 검색과 좌표 검색을 동시에 진행
+    async def get_image_url_parallel():
+        img_url = None
+        if name and address and address != ADDRESS_WHEN_NO_LOCATION:
+            # Google Photo 검색
+            img_url = await get_google_place_photo(name, address)
+        if not img_url:
+            # Naver Image 검색
+            img_query = f"{name} {food['name']}"
+            img_url = await search_naver_image(img_query, fallback_category=cat, menu_name=food.get('name'), address_hint=address)
+        return img_url
+
+    async def get_coords_parallel():
+        if use_location_search and lat is not None and lng is not None and address and address != ADDRESS_WHEN_NO_LOCATION:
+            return await get_coords_from_address(address)
+        return None
+
+    # 좌표와 이미지를 동시에 가져옴
+    coords_task = get_coords_parallel()
+    image_task = get_image_url_parallel()
+    
+    place_coords, image_url = await asyncio.gather(coords_task, image_task)
+
+    distance_km = 0.5
+    place_lat_opt: Optional[float] = None
+    place_lng_opt: Optional[float] = None
+    
+    if place_coords:
+        place_lat_val, place_lon_val = place_coords
+        distance_km = _haversine_km(lat, lng, place_lat_val, place_lon_val)
+        print(f"[GEO_OK] '{name}' coords: {place_lat_val}, {place_lon_val}. Distance: {distance_km:.2f}km")
+        # ── 하드 거리 필터 적용 ──────────────────
+        if distance_km > distance_limit:
+            print(f"[DISTANCE_SKIP] '{name}' is {distance_km:.1f}km away (Limit: {distance_limit}km). Skipping.")
+            return None
+        place_lat_opt, place_lng_opt = place_lat_val, place_lon_val
+    elif use_location_search and address and address != ADDRESS_WHEN_NO_LOCATION:
+        print(f"[GEO_FAIL] Could not get coords for '{name}' at '{address}'. Using default distance.")
+    
+    base = DEFAULT_RECOMMENDATIONS[idx % len(DEFAULT_RECOMMENDATIONS)]
+    if distance_km <= 0:
+        distance_km = base.get("distance", 0.5)
+
+    # 평점: 네이버 지역검색 API는 평점 미제공 → 식당명 기준으로 4.0~4.9 다양하게 표시
+    rating = 4.0 + (hash(name) % 10) / 10.0 if name else 4.5
+    rating = round(rating, 1)
+
+    # 이 메뉴/식당 조합에 맞는 감성 추천 문구 선택
+    reason_text = reasons_by_food_name.get(food_name, personal_advice)
+
+    return RestaurantRecommendation(
+        id=f"rec_{idx}_{food['name']}",
+        name=name,
+        category=cat,
+        distance=distance_km,
+        rating=rating,
+        reviewCount=base.get("reviewCount", 100),
+        signature=signature_display,
+        signatureCalories=int(food.get("calories", 500)),
+        price=f"{int(food.get('price_per_serving', 12000))}원" if food.get('price_per_serving') else base.get("price", "12,000원"),
+        deliveryTime=base.get("deliveryTime", "20-30분"),
+        naverLink=naver_link,
+        imageUrl=image_url,
+        reason=reason_text,
+        protein=float(food.get("protein", 20)),
+        carbs=float(food.get("carbs", 50)),
+        fat=float(food.get("fat", 15)),
+        address=address,
+        place_lat=place_lat_opt,
+        place_lng=place_lng_opt,
+    )
+
 @router.get("/{user_id}", response_model=List[RestaurantRecommendation])
 async def get_recommendations(
     user_id: str,
@@ -513,7 +777,7 @@ async def get_recommendations(
     # 0. Check if it's a dessert flow
     is_dessert_flow = preference in ['커피, 음료, 차', '빵, 케이크, 과자']
     
-    # 1. Evaluate User Features for Ranker
+    # 1. User features
     target_cal = profile.get("target_calories", 2000) if profile else 2000
     consumed_cal = sum(m.get("calories", 0) for m in meals_data)
     
@@ -526,23 +790,32 @@ async def get_recommendations(
         'companion': companion,
         'preference': preference,
         'budget': budget,
-        'categories': allowed_categories,
     }
-    
-    # 2. Fetch candidates & Rank (커피·디저트면 meal_role=side, food_group=음료 및 차류/빵 및 과자류만)
+
+    # 2. Fetch all candidates
     all_candidates = get_foods_v2_candidates()
-    if is_dessert_flow:
-        all_candidates = _filter_side_candidates(all_candidates, preference)
-    if all_candidates:
+
+    # 2a. Stage 1: SegmentFilter — Q&A 기반으로 후보 풀을 단계적으로 좁힌다
+    from models.segment_filter import SegmentFilter
+    user_qna_for_filter = {
+        'meal_type': 'dessert' if is_dessert_flow else 'main',
+        'categories': allowed_categories,
+        'preference': preference,
+        'companion': companion,
+        'budget': budget,
+        'emotion': emotion,
+    }
+    seg_filter = SegmentFilter(user_qna_for_filter)
+    filtered_candidates = seg_filter.apply(all_candidates)
+    print(f"[SEGMENT] Before: {len(all_candidates)}, After filter: {len(filtered_candidates)}")
+
+    # 2b. Stage 2: Ranker — 세그먼트 내 가중치 스코어링
+    if filtered_candidates:
         from models.ranker import RecommendationRanker
         ranker = RecommendationRanker()
-        ranked_candidates = ranker.score_candidates(all_candidates, user_features)
-        # 사용자가 음식 종류를 선택했으면, 선정 후보는 선택한 종류만 넘김 (일식 등 비선택 종류 제외)
-        if allowed_categories:
-            filtered = [c for c in ranked_candidates if (c.get('category') or '').strip() in allowed_categories]
-            top_candidates = (filtered[:10] if filtered else ranked_candidates[:10])
-        else:
-            top_candidates = ranked_candidates[:10]
+        ranked_candidates = ranker.score_candidates(filtered_candidates, user_features)
+        top_candidates = ranked_candidates[:10]
+        print(f"[RANKER] Top candidates: {[c['name'] for c in top_candidates[:5]]}")
     else:
         top_candidates = []
 
@@ -585,7 +858,6 @@ async def get_recommendations(
         return [RestaurantRecommendation(**r) for r in DEFAULT_RECOMMENDATIONS]
 
     import asyncio
-    results = []
     history_to_insert = []
 
     # 메뉴별 맞춤 추천 사유: LLM이 준 reasons를 우선 사용하고, 없으면 기분/동행/메뉴명을 섞어 감성적인 문구를 생성
@@ -606,160 +878,30 @@ async def get_recommendations(
             elif comp:
                 extra = f" {comp} 함께 먹기 좋은 메뉴예요."
             reasons_by_food_name[fname] = (base + extra)[:60]
-    # 위치 검색 시: 다른 시·도/다른 광주(경기도 광주시 vs 광주광역시) 결과 제외용
-    # 예: "광주광역시 서구 치평동" -> "광주광역시 서구" 로 필터 (시/도 + 구 단위)
-    def _region_filter_word(addr: str) -> str:
-        if not addr or not addr.strip():
-            return ""
-        parts = addr.split()
-        if len(parts) >= 2:
-            # "광주광역시 서구" / "서울특별시 강남구" / "경기도 성남시" 등
-            return f"{parts[0].strip()} {parts[1].strip()}".strip()
-        return parts[0].strip()
 
     region_filter = _region_filter_word(location_keyword) if location_keyword else ""
 
-    # 패스트푸드/커피 브랜드: 메뉴 검색 시 이 상호가 1등으로 나오면 스킵하고 다음 결과 사용
-    _SKIP_BRANDS = ("버거킹", "맥도날드", "롯데리아", "KFC", "킹스맥", "스타벅스", "이디야", "투썸", "빽다방", "메가커피", "컴포즈", "세븐일레븐", "GS25", "CU", "이마트", "홈플러스")
-
-    def _title_matches_food(item: dict, food_name: str, category: str) -> bool:
-        """식당 제목/카테고리/설명에 메뉴명 또는 관련 키워드가 있으면 True."""
-        title = (item.get("title") or "").replace("<b>", "").replace("</b>", "").lower()
-        desc = (item.get("description") or "").lower()
-        nav_cat = (item.get("category") or "").lower()
-        name_lower = (food_name or "").strip().lower()
-        cat_lower = (category or "").strip().lower()
-        if name_lower and (name_lower in title or name_lower in desc or name_lower in nav_cat):
-            return True
-        if cat_lower and cat_lower in title:
-            return True
-        # 메뉴명과 식당명에 공통 어근이 있으면 매칭 (예: 마라탕 ↔ 마라키친)
-        if name_lower and len(name_lower) >= 2:
-            for i in range(len(name_lower) - 1):
-                for j in range(i + 2, len(name_lower) + 1):
-                    sub = name_lower[i:j]
-                    if len(sub) >= 2 and sub in title:
-                        return True
-        return False
-
-    def _is_skip_brand(title: str) -> bool:
-        return any(b in title for b in _SKIP_BRANDS)
-
-    async def find_restaurant_for_food(food, idx):
-        # use_location: "[시·구·동] [메뉴명] 맛집" (주변). no location: "[메뉴명] 맛집" (비슷한 맛집만)
-        if location_keyword:
-            search_query = f"{location_keyword} {food['name']} 맛집"
-            fallback_query = f"{location_keyword} {food.get('category', '맛집')}"
-        else:
-            search_query = f"{food['name']} 맛집"
-            fallback_query = f"{food.get('category', '맛집')} 맛집"
-        print(f"[DEBUG] Searching for specific food: {search_query}")
-        
-        items = await search_naver_local(search_query)
-        used_fallback = False
-        if not items:
-            items = await search_naver_local(fallback_query)
-            used_fallback = True
-        
-        if not items:
-            return None
-        
-        # 같은 시·도만 허용 (광주 사용자에게 대전 등 다른 지역 상호 제외)
-        if region_filter:
-            combined = lambda i: (i.get("address") or "") + " " + (i.get("roadAddress") or "")
-            items = [i for i in items if region_filter in combined(i)]
-        if not items:
-            return None
-        
-        # 메뉴와 어울리지 않는 상호(패스트푸드/커피 브랜드) 스킵: 해당 메뉴 검색인데 1등이 브랜드면 다음 결과 사용
-        if not used_fallback:
-            while items and _is_skip_brand((items[0].get("title") or "").replace("<b>", "").replace("</b>", "")):
-                items = items[1:]
-        if not items:
-            return None
-        
-        food_name = food.get("name") or ""
-        food_cat = food.get("category") or "맛집"
-        # 메뉴명 검색이든 fallback이든: 식당 제목/카테고리/설명에 메뉴(또는 카테고리)가 들어간 결과를 우선 사용
-        matched = [i for i in items if _title_matches_food(i, food_name, food_cat)]
-        if matched:
-            items = matched
-            signature_display = food_name
-        else:
-            # 매칭되는 식당이 없어도 5개 유지를 위해 첫 결과 사용. 단, 해당 메뉴를 판다고 주장하지 않고 "{카테고리} 추천"으로 표시
-            signature_display = f"{food_cat} 추천"
-        item = items[0]
-        name = item.get("title", "").replace("<b>", "").replace("</b>", "")
-        # 네이버 결과에 주소가 있으면 항상 표시(위치 미허용이어도 식당 위치는 보여줌). 없을 때만 안내 문구
-        raw_address = (item.get("roadAddress") or item.get("address") or "").strip()
-        address = raw_address if raw_address else ADDRESS_WHEN_NO_LOCATION
-        naver_link = item.get("link", "https://map.naver.com")
-        cat = food.get("category", "맛집")
-        
-        # 거리 + 길찾기용 좌표: 사용자 좌표와 식당 주소로 실제 거리 계산
-        distance_km = 0.5
-        place_lat_opt: Optional[float] = None
-        place_lng_opt: Optional[float] = None
-        if use_location_search and lat is not None and lng is not None and address and address != ADDRESS_WHEN_NO_LOCATION:
-            place_coords = await get_coords_from_address(address)
-            if place_coords:
-                place_lat_val, place_lon_val = place_coords
-                distance_km = _haversine_km(lat, lng, place_lat_val, place_lon_val)
-                place_lat_opt, place_lng_opt = place_lat_val, place_lon_val
-        base = DEFAULT_RECOMMENDATIONS[idx % len(DEFAULT_RECOMMENDATIONS)]
-        if distance_km <= 0:
-            distance_km = base.get("distance", 0.5)
-        
-        # 평점: 네이버 지역검색 API는 평점 미제공 → 식당명 기준으로 4.0~4.9 다양하게 표시
-        rating = 4.0 + (hash(name) % 10) / 10.0 if name else 4.5
-        rating = round(rating, 1)
-        
-        # 이미지: Google Places 실제 식당 사진 우선 → 실패 시 네이버 이미지 검색
-        image_url = None
-        if name and address and address != ADDRESS_WHEN_NO_LOCATION:
-            image_url = await get_google_place_photo(name, address)
-        if not image_url:
-            img_query = f"{name} {food['name']}"
-            image_url = await search_naver_image(img_query, fallback_category=cat, menu_name=food.get('name'))
-        
-        # 이 메뉴/식당 조합에 맞는 감성 추천 문구 선택
-        reason_text = reasons_by_food_name.get(food_name, personal_advice)
-
-        return RestaurantRecommendation(
-            id=f"rec_{idx}_{food['name']}",
-            name=name,
-            category=cat,
-            distance=distance_km,
-            rating=rating,
-            reviewCount=base.get("reviewCount", 100),
-            signature=signature_display,
-            signatureCalories=int(food.get("calories", 500)),
-            price=f"{int(food.get('price_per_serving', 12000))}원" if food.get('price_per_serving') else base.get("price", "12,000원"),
-            deliveryTime=base.get("deliveryTime", "20-30분"),
-            naverLink=naver_link,
-            imageUrl=image_url,
-            reason=reason_text,
-            protein=float(food.get("protein", 20)),
-            carbs=float(food.get("carbs", 50)),
-            fat=float(food.get("fat", 15)),
-            address=address,
-            place_lat=place_lat_opt,
-            place_lng=place_lng_opt,
-        )
-
     # Process each recommended food in parallel to find matching restaurants (최대 5개)
-    tasks = [find_restaurant_for_food(food, i) for i, food in enumerate(display_foods[:5])]
-    gathered_results = await asyncio.gather(*tasks)
-    results = [r for r in gathered_results if r is not None]
+    # [v2.2] 1차 시도: 10km 하드 필터
+    DISTANCE_LIMIT_KM = 10.0
+    
+    tasks = [
+        find_restaurant_for_food(
+            idx, food, lat, lng, use_location_search, personal_advice,
+            reasons_by_food_name, location_keyword, region_filter, DISTANCE_LIMIT_KM
+        )
+        for idx, food in enumerate(display_foods[:5])
+    ]
+    
+    raw_results = await asyncio.gather(*tasks)
+    results = [r for r in raw_results if r is not None]
+    
+    print(f"[DEBUG] Final filtered results count: {len(results)}")
 
     # 정렬: 위치 검색 시 거리 가까운 순, 아니면 LLM/추천 순서 유지
     if use_location_search and lat is not None and lng is not None:
         results.sort(key=lambda r: r.distance)
 
-    # 주변 검색을 해봤는데도 결과가 0개인 경우:
-    # - 예전에는 서울 강남 테헤란로에 있는 DEFAULT_RECOMMENDATIONS 를 그대로 돌려줘서
-    #   광주 등 다른 지역 사용자에게도 강남 주소가 떠버리는 문제가 있었음.
-    # - 이제는 위치 기반 모드(use_location_search=True)에서는 같은 기본 카드라도
     #   주소/좌표를 "현재 사용자의 행정동"으로 덮어써서 보여준다.
     if not results:
         # admin_address 는 use_location_search & lat/lng 있을 때만 정의됨 (없으면 None 처리)
