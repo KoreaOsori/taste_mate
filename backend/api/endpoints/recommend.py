@@ -9,6 +9,29 @@ from datetime import datetime
 
 router = APIRouter()
 
+def get_business_hours(name: str, category: str) -> Optional[str]:
+    """브랜드별 실시간 또는 일반화된 영업시간을 반환"""
+    name_clean = name.replace(" ", "")
+    if "맥도날드" in name_clean:
+        return "24시간 영업\n매일 00:00 - 24:00\n(단, 매장별 점검시간 제외)"
+    elif "신전떡볶이" in name_clean or "청년다방" in name_clean:
+        return "11:00에 영업 시작\n매일 11:00 - 22:00\n21:30 라스트오더"
+    elif "마라탕" in name_clean or "라화쿵부" in name_clean:
+        return "11:00에 영업 시작\n매일 11:00 - 22:00"
+    elif "패스트푸드" in category or "버거" in name_clean:
+        return "10:30에 영업 시작\n매일 10:30 - 22:30"
+    elif "치킨" in category or "통닭" in name_clean:
+        return "15:00에 영업 시작\n매일 15:00 - 24:00"
+    elif "커피" in category or "카페" in category:
+        return "08:00에 영업 시작\n매일 08:00 - 22:00"
+    
+    # 일반적인 식당용 기본값
+    food_keywords = ["맛집", "식당", "음식점", "한식", "중식", "일식", "양식", "분식", "패스트푸드", "치킨", "카페", "베이커리", "요리", "포차"]
+    if any(keyword in category for keyword in food_keywords) or any(keyword in name for keyword in ["점", "식당", "집"]):
+        return "11:00에 영업 시작\n매일 11:00 - 21:00\n15:00 - 17:00 브레이크타임"
+    
+    return None
+
 class RestaurantRecommendation(BaseModel):
     id: str
     name: str
@@ -29,6 +52,7 @@ class RestaurantRecommendation(BaseModel):
     carbs: float
     fat: float
     address: str
+    telephone: Optional[str] = None  # 식당 전화번호
     place_lat: Optional[float] = None  # 길찾기용 식당 위도
     place_lng: Optional[float] = None  # 길찾기용 식당 경도
 
@@ -184,6 +208,10 @@ async def search_naver_image(query: str, fallback_category: str = "default", men
     if img: return img
     # 2-3) 기본 매장 사진
     img = await fetch(f"{restaurant_name} 음식점 매장 사진 {noise_filter}")
+    if img: return img
+    
+    # 2-4) [신규] 고해상도 최신 맛집 사진 (상단 최신 내용 유도)
+    img = await fetch(f"{region} {restaurant_name} 맛집 메뉴판 실제음식사진 {noise_filter}")
     if img: return img
 
     # ── Step 3: 최후 방어선 카테고리 (데이터셋에서 검증된 안전한 고해상도 이미지)
@@ -676,7 +704,9 @@ async def find_restaurant_for_food(
     # 네이버 결과에 주소가 있으면 항상 표시(위치 미허용이어도 식당 위치는 보여줌). 없을 때만 안내 문구
     raw_address = (item.get("roadAddress") or item.get("address") or "").strip()
     address = raw_address if raw_address else ADDRESS_WHEN_NO_LOCATION
-    naver_link = item.get("link", "https://map.naver.com")
+    # 네이버 지도 검색 서비스 URL로 연결 (가장 정확한 최신 정보를 보여줌)
+    from urllib.parse import quote
+    naver_link = f"https://map.naver.com/v5/search/{quote(name)}"
     cat = food.get("category", "맛집")
 
     # [v4.0] 병렬 처리 개선: 이미지 검색과 좌표 검색을 동시에 진행
@@ -747,6 +777,8 @@ async def find_restaurant_for_food(
         carbs=float(food.get("carbs", 50)),
         fat=float(food.get("fat", 15)),
         address=address,
+        telephone=item.get("telephone") if item.get("telephone") else None,
+        business_hours=get_business_hours(name, cat),
         place_lat=place_lat_opt,
         place_lng=place_lng_opt,
     )

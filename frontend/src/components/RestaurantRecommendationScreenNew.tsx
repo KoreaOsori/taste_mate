@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { UserProfile, Screen } from '../App';
-import { MapPin, Star, ExternalLink, Check, ChevronLeft, ChevronRight, RefreshCw, Navigation, Car, MapPinned, ArrowRight, Sparkles, Zap, MessageCircle, X } from 'lucide-react';
+import { MapPin, Star, ExternalLink, Check, ChevronLeft, ChevronRight, RefreshCw, Navigation, Clock, Phone as PhoneIcon, X, Zap, ArrowRight, MessageCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { RecommendationLoadingScreen } from './RecommendationLoadingScreen';
@@ -51,11 +51,135 @@ interface Restaurant {
   carbs: number;
   fat: number;
   address: string;
+  telephone?: string | null;
+  business_hours?: string | null;
   place_lat?: number | null;
   place_lng?: number | null;
 }
 
 // Mock data removed to ensure real API data usage
+
+function MapInitializer({ restaurant, userLocation }: { restaurant: Restaurant, userLocation: { lat: number, lng: number } | null }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const initMap = () => {
+      if (!isMounted) return;
+      const container = mapRef.current;
+      if (!container) return;
+
+      try {
+        const kakao = (window as any).kakao;
+        const resLat = restaurant.place_lat || 37.5665;
+        const resLng = restaurant.place_lng || 126.9780;
+        const restaurantPos = new kakao.maps.LatLng(resLat, resLng);
+        
+        const options = {
+          center: restaurantPos,
+          level: 4
+        };
+
+        const map = new kakao.maps.Map(container, options);
+
+        new kakao.maps.Marker({ position: restaurantPos, map: map });
+
+        const infowindow = new kakao.maps.InfoWindow({
+          content: `<div style="padding:5px;font-size:12px;font-weight:bold;color:#333;white-space:nowrap;">${restaurant.name}</div>`
+        });
+        infowindow.open(map, new kakao.maps.Marker({ position: restaurantPos, map: map }));
+
+        if (userLocation) {
+          const userPos = new kakao.maps.LatLng(userLocation.lat, userLocation.lng);
+          new kakao.maps.Marker({
+            position: userPos,
+            map: map,
+            image: new kakao.maps.MarkerImage(
+              'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png',
+              new kakao.maps.Size(32, 34)
+            )
+          });
+
+          if (restaurant.distance < 10) {
+            const bounds = new kakao.maps.LatLngBounds();
+            bounds.extend(restaurantPos);
+            bounds.extend(userPos);
+            map.setBounds(bounds);
+          }
+        }
+        setIsLoaded(true);
+        setError(null);
+      } catch (err) {
+        console.error("Map init error:", err);
+        if (isMounted) setError("지도를 초기화하는 중 오류가 발생했습니다.");
+      }
+    };
+
+    const loadScript = () => {
+      setError(null);
+      if ((window as any).kakao && (window as any).kakao.maps) {
+        try {
+          (window as any).kakao.maps.load(initMap);
+          return;
+        } catch (e) {
+          // Fallback if load() fails
+        }
+      }
+
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=c0d192e111eca0e0ab782d02f69e13e3&libraries=services&autoload=false`;
+      script.onload = () => {
+        if ((window as any).kakao && (window as any).kakao.maps) {
+          (window as any).kakao.maps.load(initMap);
+        }
+      };
+      script.onerror = () => {
+        if (isMounted) {
+          const currentDomain = window.location.origin;
+          setError(`지도를 불러오는 데 실패했습니다.\n\n[해결 방법]\n1. Kakao 개발자 센터 -> 플랫폼 -> Web에\n'${currentDomain}' 가 등록되어 있는지 확인해주세요.\n2. 현재 주소가 127.0.0.1은 아닌지 확인해주세요.`);
+        }
+      };
+      document.head.appendChild(script);
+    };
+
+    loadScript();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [restaurant, userLocation]);
+
+  return (
+    <div className="relative w-full">
+      <div 
+        ref={mapRef}
+        style={{ width: '100%', height: '260px' }}
+        className="rounded-3xl border-2 border-gray-100 overflow-hidden shadow-inner bg-gray-50 flex items-center justify-center transition-all"
+      >
+        {error ? (
+          <div className="text-gray-500 text-[11px] p-4 text-center flex flex-col items-center gap-3">
+            <p className="whitespace-pre-line leading-relaxed px-2">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-sm"
+            >
+              새로고침하여 다시 시도
+            </button>
+          </div>
+        ) : !isLoaded ? (
+          <div className="text-gray-400 text-sm flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-4 border-green-200 border-t-green-600 rounded-full animate-spin"></div>
+            <span>지도 데이터를 활성화하는 중...</span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 type QuestionStep = 'initial' | 'howMode' | 'dessertCategory' | 'emotion' | 'companion' | 'category' | 'preference' | 'budget' | 'loading' | 'result';
 
@@ -74,8 +198,13 @@ export function RestaurantRecommendationScreenNew({
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [showOrderModal, setShowOrderModal] = useState(() => sessionStorage.getItem('rec_show_modal') === 'true');
+  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(() => {
+    try {
+      const saved = sessionStorage.getItem('rec_selected_res');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
 
   // Question flow states
   const [questionStep, setQuestionStep] = useState<QuestionStep>(() => {
@@ -129,10 +258,16 @@ export function RestaurantRecommendationScreenNew({
       sessionStorage.setItem('rec_categories', JSON.stringify(selectedCategories));
       sessionStorage.setItem('rec_preferences', JSON.stringify(selectedPreferences));
       sessionStorage.setItem('rec_budget', selectedBudget);
+      sessionStorage.setItem('rec_show_modal', showOrderModal.toString());
+      if (selectedRestaurant) {
+        sessionStorage.setItem('rec_selected_res', JSON.stringify(selectedRestaurant));
+      } else {
+        sessionStorage.removeItem('rec_selected_res');
+      }
     } catch (e) {
       console.error('Failed to save session state:', e);
     }
-  }, [restaurants, questionStep, isQuickMode, selectedMealType, selectedDessertCategory, selectedEmotion, selectedCompanion, selectedCategories, selectedPreferences, selectedBudget]);
+  }, [restaurants, questionStep, isQuickMode, selectedMealType, selectedDessertCategory, selectedEmotion, selectedCompanion, selectedCategories, selectedPreferences, selectedBudget, showOrderModal, selectedRestaurant]);
 
   // resetKey 변경 시(추천 탭 재클릭) 질문 첫 화면으로 리셋
   // [v2.2/v4.0] resetKey가 이전과 다르고 0보다 클 때만 리셋 (마운트 시 자동 리셋 방지)
@@ -743,14 +878,20 @@ export function RestaurantRecommendationScreenNew({
             }
           }}
         />
+
+        {/* Map initialization is now handled component-side with ref */}
+
         <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
-          <DialogContent hideCloseButton className="sm:max-w-md rounded-t-3xl p-0 overflow-hidden border-none max-h-[90vh] flex flex-col">
+          <DialogContent className="max-w-[calc(100%-32px)] sm:max-w-md w-full p-0 overflow-hidden rounded-[32px] border-none bg-white max-h-[90vh]">
+            <div className="flex flex-col h-full overflow-x-hidden">
             <DialogHeader className="px-6 py-6 border-b border-gray-100 relative shrink-0">
               <div className="flex flex-col gap-1 items-start text-left pr-8">
                 {selectedRestaurant && (
                   <>
                     <span className="text-sm font-bold text-green-600 px-2 py-0.5 bg-green-50 rounded-lg">{selectedRestaurant.category}</span>
-                    <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight leading-tight">{selectedRestaurant.name}</DialogTitle>
+                    <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight leading-tight mt-1">
+                      {selectedRestaurant.name}
+                    </DialogTitle>
                   </>
                 )}
               </div>
@@ -798,6 +939,7 @@ export function RestaurantRecommendationScreenNew({
                       <span className="text-base font-bold text-gray-900">{selectedRestaurant.rating}</span>
                     </div>
                   </div>
+
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                     <p className="text-xs font-bold text-gray-700 mb-2">영양 밸런스</p>
                     <div className="grid grid-cols-3 gap-2">
@@ -815,45 +957,109 @@ export function RestaurantRecommendationScreenNew({
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-3 bg-green-50 p-4 rounded-xl border border-green-100">
-                    <MapPin className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-gray-800 mb-0.5">식당 위치</p>
-                      <p className="text-sm text-gray-700 leading-snug break-words">{selectedRestaurant.address}</p>
+
+                  {/* Kakao Map Integration */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-gray-900">
+                      <MapPin className="w-5 h-5 text-red-500" />
+                      <span className="text-base font-bold">식당 위치</span>
                     </div>
+                    <div className="bg-green-50/50 p-4 rounded-2xl border border-green-100">
+                      <p className="text-sm text-gray-700 leading-relaxed font-medium">
+                        {selectedRestaurant.address}
+                      </p>
+                    </div>
+
+                    {/* Map Initializer (now renders the container) */}
+                    <MapInitializer 
+                      restaurant={selectedRestaurant} 
+                      userLocation={userLocationData} 
+                    />
                   </div>
-                  {/* 길찾기: 네이버는 iframe 임베드 차단으로 새 탭 링크만 제공 */}
-                  <div>
-                    <p className="text-xs font-bold text-gray-800 mb-2">길찾기</p>
-                    <p className="text-xs text-gray-500 mb-2">지도 앱에서 경로를 확인하세요.</p>
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        href={selectedRestaurant.naverLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#03C75A] text-white rounded-xl text-sm font-bold hover:opacity-90"
+
+                  {/* Directions Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-gray-900">
+                        <Navigation className="w-5 h-5 text-blue-500" />
+                        <span className="text-base font-bold">길찾기</span>
+                      </div>
+                      <Button 
+                        onClick={() => {
+                          const url = `https://map.kakao.com/link/to/${encodeURIComponent(selectedRestaurant.name)},${selectedRestaurant.place_lat},${selectedRestaurant.place_lng}`;
+                          window.open(url, '_blank');
+                        }}
+                        className="bg-[#FEE500] hover:bg-[#FADA0A] text-[#3C1E1E] font-bold h-10 px-4 rounded-xl flex items-center gap-2 shadow-sm"
                       >
-                        <MapPin className="w-4 h-4" /> 네이버 지도에서 보기
-                      </a>
-                      {selectedRestaurant.place_lat != null && selectedRestaurant.place_lng != null && (
-                        <a
-                          href={`https://map.kakao.com/link/to/${encodeURIComponent(selectedRestaurant.name)},${selectedRestaurant.place_lat},${selectedRestaurant.place_lng}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#FEE500] text-[#191919] rounded-xl text-sm font-bold hover:opacity-90"
+                        <img src="https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_small.png" alt="Kakao" className="w-4 h-4" />
+                        카카오맵 길찾기
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500">지도 앱에서 경로를 확인하세요.</p>
+                  </div>
+
+                  {/* Naver Map Link Section & Operating Hours */}
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center gap-2 text-gray-900">
+                      <ExternalLink className="w-5 h-5 text-green-600" />
+                      <span className="text-base font-bold">네이버 상세 정보</span>
+                    </div>
+                    <div className="space-y-3">
+                      <a 
+                        href={selectedRestaurant.naverLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="block w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 hover:border-green-500 hover:bg-white transition-all group overflow-hidden"
+                      >
+                        <p 
+                          className="text-[11px] text-blue-600 font-medium group-hover:text-green-600 leading-normal"
+                          style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
                         >
-                          <MapPin className="w-4 h-4" /> 카카오맵 길찾기
-                        </a>
+                          {selectedRestaurant.naverLink}
+                        </p>
+                      </a>
+
+                      {selectedRestaurant.business_hours && (
+                        <div className="p-4 bg-orange-50/30 rounded-2xl border border-orange-100/50">
+                          <div className="flex items-start gap-3">
+                            <Clock className="w-5 h-5 text-orange-500 mt-0.5" />
+                            <div className="space-y-1">
+                              <p className="text-sm font-bold text-gray-900">영업시간</p>
+                              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line font-medium">
+                                {selectedRestaurant.business_hours}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
+
+                  {/* Store Info Section (Telephone only now) */}
+                  {selectedRestaurant.telephone && (
+                    <div className="bg-gray-50/50 p-5 rounded-3xl border border-gray-100 space-y-4">
+                      <div className="flex items-start gap-3">
+                        <PhoneIcon className="w-5 h-5 text-gray-500 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-gray-900 mb-1">전화번호</p>
+                          <p className="text-sm text-gray-600 font-medium">{selectedRestaurant.telephone}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-4">
+                    <Button
+                      onClick={() => handleConfirmOrder(selectedRestaurant)}
+                      className="w-full h-14 bg-green-600 hover:bg-green-700 text-white font-black text-lg rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Check className="w-6 h-6" />
+                      좋아요, 이걸로 먹을게요!
+                    </Button>
+                  </div>
                 </>
               )}
-            </div>
-            <div className="p-6 pt-0">
-              <Button className="w-full h-14 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold" onClick={() => selectedRestaurant && handleConfirmOrder(selectedRestaurant)}>
-                <Check className="w-6 h-6 mr-2" />좋아요, 이걸로 먹을게요!
-              </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
