@@ -745,20 +745,23 @@ export function RestaurantRecommendationScreenNew({
         />
         <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
           <DialogContent hideCloseButton className="sm:max-w-md rounded-t-3xl p-0 overflow-hidden border-none max-h-[90vh] flex flex-col">
-            <DialogHeader className="p-0 shrink-0">
-              <div className="relative h-36 w-full">
+            <DialogHeader className="px-6 py-6 border-b border-gray-100 relative shrink-0">
+              <div className="flex flex-col gap-1 items-start text-left pr-8">
                 {selectedRestaurant && (
                   <>
-                    <img src={selectedRestaurant.imageUrl} alt={selectedRestaurant.name} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                    <button type="button" onClick={() => setShowOrderModal(false)} className="absolute top-3 right-3 z-10 w-10 h-10 bg-black/50 hover:bg-black/60 rounded-full flex items-center justify-center text-white shadow-lg" aria-label="닫기"><X className="w-5 h-5 stroke-[2.5]" strokeWidth={2.5} /></button>
-                    <div className="absolute bottom-3 left-4 text-white text-left">
-                      <span className="text-xs font-semibold text-green-300">{selectedRestaurant.category}</span>
-                      <DialogTitle className="text-lg font-bold text-white leading-tight">{selectedRestaurant.name}</DialogTitle>
-                    </div>
+                    <span className="text-sm font-bold text-green-600 px-2 py-0.5 bg-green-50 rounded-lg">{selectedRestaurant.category}</span>
+                    <DialogTitle className="text-2xl font-black text-gray-900 tracking-tight leading-tight">{selectedRestaurant.name}</DialogTitle>
                   </>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => setShowOrderModal(false)}
+                className="absolute top-6 right-5 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors"
+                aria-label="닫기"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </DialogHeader>
             {selectedRestaurant && (
               <DialogDescription className="sr-only">

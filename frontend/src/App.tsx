@@ -385,7 +385,7 @@ export default function App() {
       </div>
 
       {/* Main content */}
-      <div className={currentScreen === 'login' || currentScreen === 'signup' || currentScreen === 'location' || currentScreen === 'onboarding' ? '' : 'pb-20'}>
+      <div className={currentScreen === 'login' || currentScreen === 'signup' || currentScreen === 'location' || currentScreen === 'onboarding' ? '' : 'pb-24'}>
         {currentScreen === 'login' && (
           <LoginScreen
             onLoginSuccess={handleLoginSuccess}
@@ -479,8 +479,8 @@ export default function App() {
 
       {/* Bottom navigation - only show after onboarding */}
       {currentScreen !== 'login' && currentScreen !== 'signup' && currentScreen !== 'location' && currentScreen !== 'onboarding' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 safe-area-inset-bottom">
-          <div className="flex justify-around items-center max-w-md mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 px-2 py-2 safe-area-inset-bottom z-[9999]">
+          <div className="flex justify-around items-center max-w-md mx-auto relative">
             <button
               onClick={() => setCurrentScreen('home')}
               className={`flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors ${currentScreen === 'home' ? 'text-green-600' : 'text-gray-500'

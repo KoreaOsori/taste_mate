@@ -150,13 +150,14 @@ async def search_naver_image(query: str, fallback_category: str = "default", men
         return None
 
     restaurant_name = query.split(' ')[0]
+    # 메뉴명에서 '추천' 등 제거
     raw_menu = (menu_name or "").strip()
-    # 메뉴명에서 '추천' 같은 불필요한 단어 제거 (예: "아시안 추천" -> "아시안")
     menu = raw_menu.replace("추천", "").replace("관련", "").strip()
     
-    noise_filter = "-대회 -소식 -공지 -안내 -행사 -이벤트 -응원 -축구 -야구 -스포츠 -리뷰이벤트 -모집 -레시피 -만들기 -홈메이드 -배달의민족 -요기요 -쿠팡이츠"
+    # 노이즈 필터 강화: 프로모션, 이벤트, 영수증 등 제외
+    noise_filter = "-캐릭터 -일러스트 -만화 -애니 -샘플 -sample -치즈 -소식 -공지 -행사 -이벤트 -가짜 -쿠폰 -프로모션 -안내 -일정 -변경"
 
-    # 지역 추출 (구/동 단위)
+    # 지역 단위 추출 (경남 창원시 의창구 -> 의창구)
     region = ""
     if address_hint:
         parts = address_hint.split()
@@ -165,20 +166,27 @@ async def search_naver_image(query: str, fallback_category: str = "default", men
         elif len(parts) >= 2:
             region = parts[-1]
 
-    # ── Step 1: [식당명 + 메뉴] 가장 구체적인 메뉴 상세 사진
-    if menu:
-        img = await fetch(f"{region} {restaurant_name} {menu} 방문자 리뷰 사진 {noise_filter}")
+    # ── Step 1: 네이버 플레이스 공식 대표 사진 및 메뉴 사진 타겟팅 (최상위 정확도)
+    if menu and region:
+        # 1-1) [식당명 + 대표메뉴] 조합으로 업체가 등록한 공식 사진 유도
+        img = await fetch(f"{region} {restaurant_name} {menu} 대표사진 업체등록사진 {noise_filter}")
         if img: return img
-        img = await fetch(f"{restaurant_name} {menu} 사진 {noise_filter}")
+        # 1-2) [식당명 + 대표메뉴] 일반 음식 사진
+        img = await fetch(f"{region} {menu} {restaurant_name} 음식점사진 {noise_filter}")
         if img: return img
 
-    # ── Step 2: [식당명 + 매장] 매장 내부/외부 장소 사진
+    # ── Step 2: 해당 음식점의 실제 매장/업체 사진 (오답 브랜드 방어벽)
+    # 2-1) 업체 등록 공식 사진 (플레이스 등록 사진)
+    img = await fetch(f"{restaurant_name} 공식 업체 등록 사진 {noise_filter}")
+    if img: return img
+    # 2-2) 매장 내외부 전경
     img = await fetch(f"{region} {restaurant_name} 매장 내부 외부 업체사진 {noise_filter}")
     if img: return img
-    img = await fetch(f"{restaurant_name} 매장 사진 {noise_filter}")
+    # 2-3) 기본 매장 사진
+    img = await fetch(f"{restaurant_name} 음식점 매장 사진 {noise_filter}")
     if img: return img
 
-    # ── Step 3: [카테고리 대표 이미지] 엉뚱한 이미지 방지용 엄격한 Fallback
+    # ── Step 3: 최후 방어선 카테고리 (데이터셋에서 검증된 안전한 고해상도 이미지)
     return CATEGORY_FALLBACK_IMAGES.get(fallback_category, CATEGORY_FALLBACK_IMAGES["default"])
 
 async def get_google_place_photo(place_name: str, address: str) -> Optional[str]:
@@ -881,26 +889,39 @@ async def get_recommendations(
 
     region_filter = _region_filter_word(location_keyword) if location_keyword else ""
 
-    # Process each recommended food in parallel to find matching restaurants (최대 5개)
+    # Process each recommended food in parallel to find matching restaurants (최대 5개 유니크 결과 보장)
     # [v2.2] 1차 시도: 10km 하드 필터
     DISTANCE_LIMIT_KM = 10.0
     
+    # [v8.0] 중복 제거를 위해 더 넉넉하게 후보를 병렬로 검색합니다 (상위 8개 후보)
     tasks = [
         find_restaurant_for_food(
             idx, food, lat, lng, use_location_search, personal_advice,
             reasons_by_food_name, location_keyword, region_filter, DISTANCE_LIMIT_KM
         )
-        for idx, food in enumerate(display_foods[:5])
+        for idx, food in enumerate(display_foods[:8])
     ]
     
     raw_results = await asyncio.gather(*tasks)
-    results = [r for r in raw_results if r is not None]
     
-    print(f"[DEBUG] Final filtered results count: {len(results)}")
+    # 중복 제거 및 유효 결과 필터링
+    seen_names = set()
+    results = []
+    for r in raw_results:
+        if r is None: continue
+        if r.name in seen_names:
+            print(f"[DUPLICATE_SKIP] '{r.name}' already recommended. Skipping.")
+            continue
+        seen_names.add(r.name)
+        results.append(r)
+        if len(results) >= 5: break # 5개면 충분
+    
+    print(f"[DEBUG] Final filtered results count: {len(results)} (Unique)")
 
-    # 정렬: 위치 검색 시 거리 가까운 순, 아니면 LLM/추천 순서 유지
+    # 정렬: 무조건 거리(km)가 낮은 순서(가까운 순)로 1~5번 정렬 보장
     if use_location_search and lat is not None and lng is not None:
-        results.sort(key=lambda r: r.distance)
+        results.sort(key=lambda r: float(r.distance) if r.distance is not None else 999.0)
+        print(f"[SORT_OK] Sorted {len(results)} items by distance.")
 
     #   주소/좌표를 "현재 사용자의 행정동"으로 덮어써서 보여준다.
     if not results:

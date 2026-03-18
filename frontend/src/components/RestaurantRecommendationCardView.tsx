@@ -55,18 +55,23 @@ export function RestaurantRecommendationCardView({
   const isNight = theme === 'night';
 
   const handleSwipe = (direction: 'left' | 'right') => {
-    if (direction === 'right') {
-      if (onLike) onLike(currentRestaurant);
-      setExitX(1000);
-    } else {
-      if (onDislike) onDislike(currentRestaurant);
+    if (direction === 'left') {
+      // 다음 카드 (1/5 -> 2/5)
       setExitX(-1000);
+      setTimeout(() => {
+        setExitX(0);
+        setCurrentIndex((prev) => (prev + 1) % restaurants.length);
+        setDragProgress(0);
+      }, 200);
+    } else {
+      // 이전 카드 (2/5 -> 1/5)
+      setExitX(1000);
+      setTimeout(() => {
+        setExitX(0);
+        setCurrentIndex((prev) => (prev === 0 ? restaurants.length - 1 : prev - 1));
+        setDragProgress(0);
+      }, 200);
     }
-    setTimeout(() => {
-      setExitX(0);
-      setCurrentIndex((prev) => (prev + 1) % restaurants.length);
-      setDragProgress(0);
-    }, 250);
   };
 
   /* ── 영양소 바 ─────────────────────────── */
@@ -77,6 +82,8 @@ export function RestaurantRecommendationCardView({
     textColor,
     barColor,
     maxValue = 100,
+    labelTextColor,
+    valueTextColor,
   }: {
     label: string;
     value: number;
@@ -84,18 +91,21 @@ export function RestaurantRecommendationCardView({
     textColor: string;
     barColor: string;
     maxValue?: number;
+    labelTextColor?: string;
+    valueTextColor?: string;
   }) => (
     <div className={`flex flex-col gap-2 flex-1 px-4 py-4 rounded-2xl border ${bgColor}`}>
       <div className="flex justify-between items-center">
-        <span className={`text-[11px] font-bold tracking-wide uppercase ${textColor}`}>{label}</span>
-        <span className={`text-sm font-black ${isNight ? 'text-white' : 'text-gray-900'}`}>{value}g</span>
+        <span className="text-[11px] font-bold tracking-wide uppercase" style={{ color: labelTextColor || textColor }}>{label}</span>
+        <span className="text-sm font-black" style={{ color: valueTextColor || '#111827' }}>{value}g</span>
       </div>
-      <div className={`h-3 w-full rounded-full overflow-hidden ${isNight ? 'bg-slate-700' : 'bg-white/70'}`}>
+      <div className="h-3 w-full rounded-full overflow-hidden transition-all bg-gray-100">
         <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${Math.min((value / maxValue) * 100, 100)}%` }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-          className={`h-full rounded-full ${barColor} shadow-sm`}
+           initial={{ width: 0 }}
+           animate={{ width: `${Math.min((value / maxValue) * 100, 100)}%` }}
+           transition={{ duration: 0.6, ease: 'easeOut' }}
+           className="h-full rounded-full shadow-sm"
+           style={{ backgroundColor: barColor }}
         />
       </div>
     </div>
@@ -109,6 +119,7 @@ export function RestaurantRecommendationCardView({
     bg,
     iconColor,
     valueColor,
+    labelColor,
   }: {
     icon: React.ElementType;
     value: string;
@@ -116,16 +127,23 @@ export function RestaurantRecommendationCardView({
     bg: string;
     iconColor: string;
     valueColor: string;
+    labelColor?: string;
   }) => (
-    <div className={`flex flex-col items-center gap-1.5 py-4 rounded-3xl border-2 ${bg} ${isNight ? 'border-slate-700/50' : 'border-transparent'}`}>
-      <Icon className={`w-5 h-5 ${iconColor}`} />
-      <span className={`text-base font-black leading-none ${valueColor}`}>{value}</span>
-      <span className={`text-[10px] font-semibold tracking-wide ${isNight ? 'text-slate-500' : 'text-gray-400'}`}>{label}</span>
+    <div className={`flex flex-col items-center gap-1.5 py-4 rounded-3xl border-2 ${bg} border-transparent`}>
+      <Icon className="w-5 h-5 shrink-0" style={{ color: iconColor }} />
+      <span className="text-base font-black leading-none" style={{ color: valueColor }}>{value}</span>
+      <span className="text-[10px] font-semibold tracking-wide" style={{ color: labelColor || '#9ca3af' }}>{label}</span>
     </div>
   );
 
+  // [v7.0] 가시성 100% 보장을 위해 다크룸(isNight) 테마 판단 로직을 텍스트 색상에서 제거하고, 
+  // 흰 배경에 가장 잘 보이는 프리미엄 블랙/다크그레이 톤으로 고정합니다.
+  const infoTextColor = '#111827'; // gray-900 (메인 텍스트)
+  const subTextColor = '#374151'; // gray-700 (부가 정보)
+  const labelTextColor = '#6b7280'; // gray-500 (라벨)
+
   return (
-    <div className={`relative w-full h-full flex flex-col items-center overflow-hidden p-4 pt-2 pb-6 transition-all duration-1000 ${isNight ? 'bg-slate-950' : 'bg-slate-50'}`}>
+    <div className="relative w-full h-full flex flex-col items-center overflow-hidden p-4 pt-2 pb-6 transition-all duration-1000 bg-slate-50">
 
       {/* ── 헤더 ─────────────────────────────── */}
       <div className="w-full flex items-center justify-between px-2 mt-2 mb-3 shrink-0 max-w-lg z-20">
@@ -144,12 +162,18 @@ export function RestaurantRecommendationCardView({
           <motion.div
             key={currentRestaurant.id}
             drag="x"
+            dragDirectionLock
             dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.7}
             onDrag={(_, info) => setDragProgress(info.offset.x)}
             onDragEnd={(_, info) => {
               const dx = info.offset.x;
-              if (dx > 100) handleSwipe('right');
-              else if (dx < -100) handleSwipe('left');
+              const vx = info.velocity.x;
+              // 수평 스크롤이 80px 이상이거나 속도가 빠르면 Swipe 인정
+              // 왼쪽으로 밀기 (dx < 0) -> Next
+              // 오른쪽으로 밀기 (dx > 0) -> Prev
+              if (dx < -80 || (dx < -30 && vx < -400)) handleSwipe('left');
+              else if (dx > 80 || (dx > 30 && vx > 400)) handleSwipe('right');
               else {
                 setDragProgress(0);
                 if (Math.abs(dx) <= TAP_THRESHOLD_PX) onSelectRestaurant(currentRestaurant);
@@ -158,7 +182,8 @@ export function RestaurantRecommendationCardView({
             initial={{ scale: 0.95, opacity: 0, y: 15 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ x: exitX, opacity: 0, scale: 0.95, transition: { duration: 0.25 } }}
-            className={`relative flex flex-col w-full h-full rounded-[3rem] shadow-[0_40px_90px_-20px_rgba(0,0,0,0.28)] overflow-hidden ${isNight ? 'bg-slate-900 border border-slate-800' : 'bg-white'}`}
+            onClick={() => onSelectRestaurant(currentRestaurant)}
+            className={`relative flex flex-col w-full h-full rounded-[3rem] shadow-[0_40px_90px_-20px_rgba(0,0,0,0.28)] overflow-hidden ${isNight ? 'bg-slate-900 border border-slate-800' : 'bg-white text-gray-900'}`}
           >
             {/* ── 이미지 영역: 55% 고정 (스크롤 방지 가능 마지노선) ────────── */}
             <div className="relative w-full shrink-0 overflow-hidden bg-gray-100" style={{ height: '55%' }}>
@@ -188,40 +213,28 @@ export function RestaurantRecommendationCardView({
                 </span>
               </div>
 
-              {/* 스와이프 스탬프 */}
-              <motion.div
-                style={{ opacity: dragProgress > 60 ? Math.min((dragProgress - 60) / 100, 1) : 0 }}
-                className="absolute bottom-6 left-8 z-20 border-[5px] border-emerald-400 rounded-3xl px-7 py-2.5 -rotate-12 bg-white/95 shadow-2xl pointer-events-none"
-              >
-                <span className="text-emerald-500 text-3xl font-black uppercase">LIKE</span>
-              </motion.div>
-              <motion.div
-                style={{ opacity: dragProgress < -60 ? Math.min(Math.abs(dragProgress + 60) / 100, 1) : 0 }}
-                className="absolute bottom-6 right-8 z-20 border-[5px] border-rose-400 rounded-3xl px-7 py-2.5 rotate-12 bg-white/95 shadow-2xl pointer-events-none"
-              >
-                <span className="text-rose-500 text-3xl font-black uppercase">PASS</span>
-              </motion.div>
+              {/* 스탬프 제거 - 갤러리식 양방향 탐색에 집중 */}
             </div>
 
             {/* ── 정보 영역 (40%) ───────────────── */}
-            <div className={`px-6 pt-5 pb-5 flex flex-col gap-4 flex-1 overflow-y-auto ${isNight ? 'bg-slate-900 text-white' : 'bg-white'}`}>
+            <div className="px-6 pt-5 pb-5 flex flex-col gap-4 flex-1 overflow-y-auto bg-white">
 
               {/* 식당명 */}
               <div className="flex items-start justify-between gap-3">
                 {/* 식당명 크기 대폭 증가 (h2급, 30px) */}
-                <h3 className={`text-3xl font-black tracking-tight leading-tight flex-1 ${isNight ? 'text-white' : 'text-gray-900'}`}>
+                <h3 className="text-3xl font-black tracking-tight leading-tight flex-1" style={{ color: infoTextColor }}>
                   {currentRestaurant.name}
                 </h3>
               </div>
 
               {/* 주요 메뉴 표시 (크기 확대) */}
-              <div className={`flex items-center gap-2 mt-1 ${isNight ? 'text-indigo-300' : 'text-green-700'}`}>
+              <div className="flex items-center gap-2 mt-1" style={{ color: '#15803d' }}>
                 <Utensils className="w-5 h-5 shrink-0" />
-                <span className={`text-sm font-bold ${isNight ? 'text-slate-400' : 'text-gray-500'}`}>주요 메뉴</span>
+                <span className="text-sm font-bold" style={{ color: labelTextColor }}>주요 메뉴</span>
                 <span className="text-lg font-black">:</span>
-                <span className="text-lg font-black flex-1 truncate">
+                <span className="text-lg font-black flex-1 truncate" style={{ color: infoTextColor }}>
                   {currentRestaurant.signature}
-                  <span className={`ml-2 text-sm font-bold px-2.5 py-0.5 rounded-full shadow-sm ${isNight ? 'bg-indigo-800/60 text-indigo-300' : 'bg-green-100/80 text-green-700'}`}>
+                  <span className="ml-2 text-sm font-bold px-2.5 py-0.5 rounded-full shadow-sm bg-green-100/80 text-green-700">
                     추천음식
                   </span>
                 </span>
@@ -233,31 +246,34 @@ export function RestaurantRecommendationCardView({
                   icon={MapPin}
                   value={`${currentRestaurant.distance}km`}
                   label="거리"
-                  bg={isNight ? 'bg-blue-900/30' : 'bg-blue-50'}
-                  iconColor="text-blue-500"
-                  valueColor={isNight ? 'text-blue-300' : 'text-blue-700'}
+                  bg="bg-blue-50"
+                  iconColor="#3b82f6"
+                  valueColor="#1d4ed8"
+                  labelColor={labelTextColor}
                 />
                 <StatCard
                   icon={Utensils}
                   value={currentRestaurant.price}
                   label="가격"
-                  bg={isNight ? 'bg-orange-900/30' : 'bg-orange-50'}
-                  iconColor="text-orange-500"
-                  valueColor={isNight ? 'text-orange-300' : 'text-orange-700'}
+                  bg="bg-orange-50"
+                  iconColor="#f97316"
+                  valueColor="#c2410c"
+                  labelColor={labelTextColor}
                 />
                 <StatCard
                   icon={Zap}
                   value={`${currentRestaurant.signatureCalories}`}
                   label="kcal"
-                  bg={isNight ? 'bg-emerald-900/30' : 'bg-emerald-50'}
-                  iconColor="text-emerald-500"
-                  valueColor={isNight ? 'text-emerald-300' : 'text-emerald-700'}
+                  bg="bg-emerald-50"
+                  iconColor="#10b981"
+                  valueColor="#047857"
+                  labelColor={labelTextColor}
                 />
               </div>
 
               {/* 한줄평 - 글자 크기 증가 */}
-              <div className={`px-4 py-3 rounded-2xl border ${isNight ? 'bg-slate-800/60 border-slate-700/40' : 'bg-gray-50 border-gray-100'}`}>
-                <p className={`text-base font-semibold leading-snug italic text-center ${isNight ? 'text-slate-200' : 'text-gray-700'}`}>
+              <div className="px-4 py-3 rounded-2xl border bg-gray-50 border-gray-100">
+                <p className="text-base font-semibold leading-snug italic text-center" style={{ color: subTextColor }}>
                   "{currentRestaurant.reason}"
                 </p>
               </div>
@@ -271,29 +287,35 @@ export function RestaurantRecommendationCardView({
                   </span>
                 </div>
                 <div className="flex gap-2">
-                  <NutrientBar
+                <NutrientBar
                     label="탄수화물"
                     value={currentRestaurant.carbs}
-                    bgColor={isNight ? 'bg-blue-900/40 border-blue-700/30' : 'bg-blue-50 border-blue-100'}
-                    textColor={isNight ? 'text-blue-400' : 'text-blue-500'}
-                    barColor="bg-blue-500"
+                    bgColor="bg-blue-50 border-blue-100"
+                    textColor="#3b82f6"
+                    barColor="#3b82f6"
                     maxValue={100}
+                    labelTextColor={labelTextColor}
+                    valueTextColor={infoTextColor}
                   />
                   <NutrientBar
                     label="단백질"
                     value={currentRestaurant.protein}
-                    bgColor={isNight ? 'bg-rose-900/40 border-rose-700/30' : 'bg-red-50 border-red-100'}
-                    textColor={isNight ? 'text-rose-400' : 'text-rose-500'}
-                    barColor="bg-rose-500"
+                    bgColor="bg-red-50 border-red-100"
+                    textColor="#f43f5e"
+                    barColor="#f43f5e"
                     maxValue={60}
+                    labelTextColor={labelTextColor}
+                    valueTextColor={infoTextColor}
                   />
                   <NutrientBar
                     label="지방"
                     value={currentRestaurant.fat}
-                    bgColor={isNight ? 'bg-amber-900/40 border-amber-700/30' : 'bg-amber-50 border-amber-100'}
-                    textColor={isNight ? 'text-amber-400' : 'text-amber-500'}
-                    barColor="bg-amber-500"
+                    bgColor="bg-amber-50 border-amber-100"
+                    textColor="#f59e0b"
+                    barColor="#f59e0b"
                     maxValue={50}
+                    labelTextColor={labelTextColor}
+                    valueTextColor={infoTextColor}
                   />
                 </div>
               </div>
@@ -322,7 +344,7 @@ export function RestaurantRecommendationCardView({
            ↺      → 새 추천 목록 가져오기
            ♥(Like) → like / 알고리즘 반영
       ──────────────────────────────────────── */}
-      <div className="w-full flex items-center justify-center gap-[4.5rem] py-3 shrink-0 max-w-lg z-20 pb-6">
+      <div className="w-full flex items-center justify-center gap-4 py-3 shrink-0 max-w-lg z-20 pb-6">
 
         {/* PASS (Nope) 버튼 */}
         <div className="flex flex-col items-center gap-2">
@@ -330,11 +352,12 @@ export function RestaurantRecommendationCardView({
             whileTap={{ scale: 0.88 }}
             whileHover={{ scale: 1.05 }}
             onClick={() => handleSwipe('left')}
-            className={`w-[68px] h-[68px] rounded-full flex items-center justify-center text-4xl shadow-lg border border-gray-100 transition-all ${isNight ? 'bg-slate-800' : 'bg-white'}`}
+            className="w-[68px] h-[68px] rounded-full flex items-center justify-center text-4xl shadow-lg border border-gray-100 transition-all font-black bg-white"
+            style={{ color: '#f43f5e' }}
           >
-            ❌
+            X
           </motion.button>
-          <span className={`text-[12px] font-black uppercase ${isNight ? 'text-slate-500' : 'text-gray-400'}`}>Nope</span>
+          <span className="text-[12px] font-black uppercase text-gray-400">Nope</span>
         </div>
 
         {/* 새로고침 버튼 */}
@@ -343,11 +366,12 @@ export function RestaurantRecommendationCardView({
             whileTap={{ rotate: 180, scale: 0.9 }}
             whileHover={{ scale: 1.05 }}
             onClick={() => { if (onRefresh) onRefresh(); }}
-            className={`w-[68px] h-[68px] rounded-full flex items-center justify-center text-4xl shadow-md border border-gray-100 transition-all ${isNight ? 'bg-slate-800' : 'bg-white'}`}
+            className="w-[68px] h-[68px] rounded-full flex items-center justify-center text-5xl shadow-md border border-gray-100 transition-all font-black bg-white"
+            style={{ color: '#3b82f6' }}
           >
-            🔄
+            ↻
           </motion.button>
-          <span className={`text-[12px] font-black uppercase ${isNight ? 'text-slate-500' : 'text-gray-400'}`}>새추천</span>
+          <span className="text-[12px] font-black uppercase text-gray-400">새추천</span>
         </div>
 
         {/* LIKE 버튼 */}
@@ -355,12 +379,16 @@ export function RestaurantRecommendationCardView({
           <motion.button
             whileTap={{ scale: 0.88 }}
             whileHover={{ scale: 1.05 }}
-            onClick={() => handleSwipe('right')}
-            className={`w-[68px] h-[68px] rounded-full flex items-center justify-center text-4xl shadow-lg border border-gray-100 transition-all ${isNight ? 'bg-slate-800' : 'bg-white'}`}
+            onClick={() => {
+                if (onLike) onLike(currentRestaurant);
+                handleSwipe('left');
+            }}
+            className="w-[68px] h-[68px] rounded-full flex items-center justify-center text-4xl shadow-lg border border-gray-100 transition-all font-black bg-white"
+            style={{ color: '#10b981' }}
           >
-            💖
+            ♥
           </motion.button>
-          <span className={`text-[12px] font-black uppercase ${isNight ? 'text-slate-500' : 'text-gray-400'}`}>Like</span>
+          <span className="text-[12px] font-black uppercase text-gray-400">Like</span>
         </div>
       </div>
     </div>
