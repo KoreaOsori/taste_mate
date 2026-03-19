@@ -41,5 +41,5 @@ COPY . .
 # 8000 포트 노출
 EXPOSE 8000
 
-# Python entrypoint: 컨테이너 DNS를 8.8.8.8로 고정(Supabase 연결용). shell 스크립트 대신 사용해 Windows CRLF 문제 회피
-ENTRYPOINT ["python3", "/app/entrypoint.py"]
+# 앱 실행 (CMD를 사용하여 Railway와의 호환성 높임)
+CMD ["python3", "entrypoint.py"]
