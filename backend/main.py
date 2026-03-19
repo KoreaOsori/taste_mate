@@ -11,6 +11,9 @@ load_dotenv()
 app = FastAPI(title="Tastemate Advanced Backend", version="1.0.0")
 
 # CORS: 반드시 allow_origins를 먼저 등록 (미들웨어 순서)
+# 환경 변수에서 프론트엔드 URL을 가져옴 (배포 시 Vercel 주소 등록용)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -21,6 +24,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:8000",
+        FRONTEND_URL,
     ],
     allow_credentials=True,
     allow_methods=["*"],
