@@ -8,8 +8,9 @@ def main():
     try:
         if os.path.exists("/etc/resolv.conf"):
             with open("/etc/resolv.conf", "a") as f:
-                # 수정 대신 추가 시도, 실패해도 무시
-                pass
+    except Exception as e:
+        print(f"[entrypoint] Note: skipping resolv.conf modification: {e}")
+
     # Railway 등 클라우드 환경에서 지정하는 PORT 환경 변수를 반영
     port = os.environ.get("PORT", "8000")
     

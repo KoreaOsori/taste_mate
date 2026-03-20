@@ -43,7 +43,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(api_router, prefix="/api/v1")
 
-@app.get("/health")
+@app.get("/api/v1/health")
 async def health_check():
     return {"status": "ok", "message": "Backend is running with RAG support"}
 
