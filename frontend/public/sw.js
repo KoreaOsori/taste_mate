@@ -8,6 +8,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass-through for now, can add caching logic later
-  event.respondWith(fetch(event.request));
+  // Only intercept same-origin requests to avoid CORS issues with Supabase/APIs
+  if (event.request.url.startsWith(self.location.origin)) {
+    event.respondWith(fetch(event.request));
+  }
 });
