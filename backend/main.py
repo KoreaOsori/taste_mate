@@ -41,6 +41,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": str(exc) or "Internal server error"},
     )
 
+@app.get("/")
+async def root():
+    return {"message": "Tastemate Backend is LIVE", "docs": "/api/v1/docs"}
+
 app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/api/v1/health")
