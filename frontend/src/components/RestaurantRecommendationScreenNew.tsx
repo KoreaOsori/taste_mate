@@ -131,7 +131,8 @@ function MapInitializer({ restaurant, userLocation }: { restaurant: Restaurant, 
 
       const script = document.createElement('script');
       script.type = 'text/javascript';
-      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=c0d192e111eca0e0ab782d02f69e13e3&libraries=services&autoload=false`;
+      const kakaoKey = import.meta.env.VITE_KAKAO_JAVASCRIPT_KEY || 'c0d192e111eca0e0ab782d02f69e13e3';
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&libraries=services&autoload=false`;
       script.onload = () => {
         if ((window as any).kakao && (window as any).kakao.maps) {
           (window as any).kakao.maps.load(initMap);
