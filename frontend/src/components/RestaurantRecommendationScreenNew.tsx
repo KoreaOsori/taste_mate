@@ -883,8 +883,7 @@ export function RestaurantRecommendationScreenNew({
         {/* Map initialization is now handled component-side with ref */}
 
         <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
-          <DialogContent className="p-0 overflow-hidden rounded-[32px] border-none bg-white max-h-[90vh]">
-            <div className="flex flex-col h-full overflow-x-hidden">
+          <DialogContent className="p-0 overflow-hidden rounded-[32px] border-none bg-white max-h-[90vh] flex flex-col">
             <DialogHeader className="px-6 py-6 border-b border-gray-100 relative shrink-0">
               <div className="flex flex-col gap-1 items-start text-left pr-8">
                 {selectedRestaurant && (
@@ -1061,7 +1060,6 @@ export function RestaurantRecommendationScreenNew({
                 </>
               )}
               </div>
-            </div>
           </DialogContent>
         </Dialog>
         {feedbackRestaurant && <FeedbackModal open={showFeedbackModal} onOpenChange={(open) => { setShowFeedbackModal(open); if (!open) setFeedbackRestaurant(null); }} restaurant={feedbackRestaurant} />}
