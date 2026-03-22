@@ -883,7 +883,7 @@ export function RestaurantRecommendationScreenNew({
         {/* Map initialization is now handled component-side with ref */}
 
         <Dialog open={showOrderModal} onOpenChange={setShowOrderModal}>
-          <DialogContent className="max-w-[calc(100%-32px)] sm:max-w-md w-full p-0 overflow-hidden rounded-[32px] border-none bg-white max-h-[90vh]">
+          <DialogContent className="p-0 overflow-hidden rounded-[32px] border-none bg-white max-h-[90vh]">
             <div className="flex flex-col h-full overflow-x-hidden">
             <DialogHeader className="px-6 py-6 border-b border-gray-100 relative shrink-0">
               <div className="flex flex-col gap-1 items-start text-left pr-8">

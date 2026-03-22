@@ -588,7 +588,7 @@ export function CalendarScreenWithReport({ userProfile, onNavigate, initialSelec
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>식사 추가</DialogTitle>
             {addMealError && (
